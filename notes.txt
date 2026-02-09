@@ -1,0 +1,12 @@
+FarmOS Admin -> Us
+FarmOS User -> Owner
+FarmOS People -> Employees
+
+
+docker exec -it www bash -c "\
+mkdir -p /opt/drupal/private/keys && \
+drush simple-oauth:generate-keys /opt/drupal/private/keys && \
+chown -R www-data:www-data /opt/drupal/private/keys && \
+chmod 600 /opt/drupal/private/keys/private.key && \
+chmod 644 /opt/drupal/private/keys/public.key && \
+drush cr"
