@@ -1,10 +1,9 @@
 from django.db import models
-from resources.models import Resource
 
 class VaccinationRecord(models.Model):
     animal = models.ForeignKey('Animal', on_delete=models.CASCADE, related_name='vaccinations')
     # Link to Resource with type restricted (logic handled in validation or UI)
-    vaccine_resource = models.ForeignKey(Resource, on_delete=models.PROTECT) 
+    vaccine_resource = models.ForeignKey('Resource', on_delete=models.PROTECT) 
     
     date_administered = models.DateField()
     administered_by = models.CharField(max_length=100)

@@ -1,5 +1,5 @@
 from rest_framework import viewsets
-from .models.resource_types import ResourceType
+from models.resource_types import ResourceType
 from ..utils.permissions import HasRole
 
 class ResourceTypeViewSet(viewsets.ModelViewSet):
