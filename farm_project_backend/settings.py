@@ -101,7 +101,7 @@ WSGI_APPLICATION = 'farm_project_backend.wsgi.application'
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
 # 1. Tell Django to use your new User model
-# AUTH_USER_MODEL = 'users.User'
+AUTH_USER_MODEL = 'users.User'
 
 # 2. Default Database (SQLite)
 DATABASES = {

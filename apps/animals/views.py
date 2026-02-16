@@ -1,7 +1,7 @@
 from rest_framework import viewsets
 from .models.animals import Animal
 # from .serializers import AnimalSerializer
-from utils.permissions import HasRole
+from .utils.permissions import HasRole
 
 class AnimalViewSet(viewsets.ModelViewSet):
     queryset = Animal.objects.all()
