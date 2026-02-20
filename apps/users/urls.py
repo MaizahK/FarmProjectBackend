@@ -1,9 +1,12 @@
-from django.urls import path
+# project/urls.py
+from django.urls import path, include
+from rest_framework.routers import DefaultRouter
 from .views import RoleViewSet, UserViewSet
 
+router = DefaultRouter()
+router.register(r'roles', RoleViewSet)
+router.register(r'users', UserViewSet)
+
 urlpatterns = [
-    path('roles/', RoleViewSet.as_view({'get': 'list', 'post': 'create'}), name='roles'),
-    path('roles/<int:pk>/', RoleViewSet.as_view({'get': 'retrieve', 'put': 'update', 'delete': 'destroy'}), name='role-detail'),
-    path('users/', UserViewSet.as_view({'get': 'list', 'post': 'create'}), name='users'),
-    path('users/<int:pk>/', UserViewSet.as_view({'get': 'retrieve', 'put': 'update', 'delete': 'destroy'}), name='user-detail'),
+    path('api/', include(router.urls)),
 ]
