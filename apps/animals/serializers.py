@@ -1,7 +1,6 @@
 # api/serializers.py
 from rest_framework import serializers
-from .models.animals import Animal
-from .models.vaccination_records import VaccinationRecord
+from .models import *
 
 class AnimalSerializer(serializers.ModelSerializer):
     # Read-only fields for the API response
@@ -13,7 +12,7 @@ class AnimalSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'tag_id', 'name', 'species', 'breed', 
             'gender', 'birth_date', 'weight', 'health_status', 
-            'owner', 'owner_name', 'age', 'last_vet_check'
+            'owner', 'owner_name', 'age', 'last_vet_check', 'purpose'
         ]
         read_only_fields = ['owner']
 
@@ -35,4 +34,12 @@ class VaccinationRecordSerializer(serializers.ModelSerializer):
             'id', 'animal', 'animal_tag', 'vaccine_resource', 
             'vaccine_name', 'date_administered', 'administered_by', 
             'batch_number', 'next_due_date'
+        ]
+    
+class AnimalPurposeSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = AnimalPurpose
+        fields = [
+            'id', 'name', 'species'
         ]

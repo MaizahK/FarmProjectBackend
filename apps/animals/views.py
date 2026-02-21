@@ -1,9 +1,7 @@
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
-from .models.animals import Animal
-from .serializers import AnimalSerializer    
-from .models.vaccination_records import VaccinationRecord
-from .serializers import VaccinationRecordSerializer
+from .serializers import *    
+from .models import *
 
 class AnimalViewSet(viewsets.ModelViewSet):
     queryset = Animal.objects.all()
@@ -23,3 +21,17 @@ class VaccinationRecordViewSet(viewsets.ModelViewSet):
         # Optional: Add logic here to deduct the 'vaccine_resource' 
         # quantity from your Resource inventory when a vaccine is used.
         return super().create(request, *args, **kwargs)
+
+class AnimalPurposeViewSet(viewsets.ModelViewSet):
+    queryset = AnimalPurpose.objects.all()
+    serializer_class = AnimalPurposeSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        queryset = AnimalPurpose.objects.all()
+        species = self.request.query_params.get("species")
+
+        if species:
+            queryset = queryset.filter(species__iexact=species)
+
+        return queryset
