@@ -40,6 +40,7 @@ class Animal(models.Model):
     name = models.CharField(max_length=100, blank=True)
     species = models.CharField(max_length=50, choices=SPECIES_CHOICES)
     breed = models.CharField(max_length=100)
+    notes = models.CharField(max_length=5000, blank=True)
     birth_date = models.DateField()
     gender = models.CharField(max_length=1, choices=GENDER_CHOICES)
     weight = models.DecimalField(max_digits=6, decimal_places=2)

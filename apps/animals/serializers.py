@@ -12,7 +12,7 @@ class AnimalSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'tag_id', 'name', 'species', 'breed', 
             'gender', 'birth_date', 'weight', 'health_status', 
-            'owner', 'owner_name', 'age', 'last_vet_check', 'purpose'
+            'owner', 'owner_name', 'age', 'last_vet_check', 'purpose', 'notes'
         ]
         read_only_fields = ['owner']
 
