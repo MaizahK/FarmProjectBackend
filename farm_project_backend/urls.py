@@ -7,5 +7,5 @@ urlpatterns = [
     path('', include('apps.users.urls')),
     path('', include('apps.animals.urls')),
     path('', include('apps.resources.urls')),
-    # path('api/products/', include('apps.products.urls')),
+    path('', include('apps.products.urls')),
 ]
