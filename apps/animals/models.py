@@ -100,10 +100,10 @@ class VaccinationRecord(models.Model):
         related_name='vaccinations'
     )
 
-    # Link to Resource with type restricted (validation handled elsewhere)
     vaccine_resource = models.ForeignKey(
         'resources.Resource',
-        on_delete=models.PROTECT
+        on_delete=models.PROTECT,
+        limit_choices_to={'resource_type__name': 'Vaccine'}
     )
 
     date_administered = models.DateField()
