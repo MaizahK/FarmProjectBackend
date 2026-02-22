@@ -13,5 +13,5 @@ class Product(models.Model):
     quantity = models.CharField(max_length=200)
     
     def __str__(self):
-        return f"{self.name} ({self.product_type.name})"
+        return f"{self.description} ({self.product_type.name})"
 

@@ -8,6 +8,15 @@ class AnimalViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     serializer_class = AnimalSerializer
 
+    def get_queryset(self):
+        queryset = Animal.objects.all()
+        species = self.request.query_params.get("species")
+
+        if species:
+            queryset = queryset.filter(species__iexact=species)
+
+        return queryset
+
     def perform_create(self, serializer):
         # Automatically set the owner to the user making the request (from JWT)
         serializer.save(owner=self.request.user)
