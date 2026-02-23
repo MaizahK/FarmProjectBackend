@@ -10,6 +10,7 @@ class ResourceType(models.Model):
 class Resource(models.Model):
     resource_type = models.ForeignKey(ResourceType, on_delete=models.CASCADE, related_name='items')
     name = models.CharField(max_length=200) # e.g., "Polio, Grass"
+    quantity = models.CharField(max_length=200, blank=True)
     vendor = models.CharField(max_length=200, blank=True)
     
     def __str__(self):

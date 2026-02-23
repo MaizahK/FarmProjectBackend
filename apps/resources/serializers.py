@@ -12,4 +12,4 @@ class ResourceSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Resource
-        fields = ['id', 'resource_type', 'resource_type_name', 'name', 'vendor']
+        fields = ['id', 'resource_type', 'resource_type_name', 'name', 'vendor', 'quantity']
