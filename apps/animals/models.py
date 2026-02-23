@@ -97,7 +97,7 @@ class VaccinationRecord(models.Model):
     animal = models.ForeignKey(
         'Animal',
         on_delete=models.CASCADE,
-        related_name='vaccinations'
+        related_name='vaccination_records'
     )
 
     vaccine_resource = models.ForeignKey(
@@ -107,9 +107,24 @@ class VaccinationRecord(models.Model):
     )
 
     date_administered = models.DateField()
-    administered_by = models.CharField(max_length=100)
+    administered_by = models.CharField(max_length=100, blank=True)
     batch_number = models.CharField(max_length=50)
     next_due_date = models.DateField(null=True, blank=True)
 
     def __str__(self):
         return f"{self.vaccine_resource.name} -> {self.animal.tag_id}"
+    
+class HealthRecord(models.Model):
+    animal = models.ForeignKey(
+        'Animal',
+        on_delete=models.CASCADE,
+        related_name='health_records'
+    )
+
+    date_checkup = models.DateField()
+    description = models.CharField(max_length=1000)
+    checked_by = models.CharField(max_length=100, blank=True)
+    next_due_date = models.DateField(null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.description} -> {self.animal.tag_id}"

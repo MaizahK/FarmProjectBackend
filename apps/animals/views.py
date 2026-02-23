@@ -30,6 +30,16 @@ class VaccinationRecordViewSet(viewsets.ModelViewSet):
         # Optional: Add logic here to deduct the 'vaccine_resource' 
         # quantity from your Resource inventory when a vaccine is used.
         return super().create(request, *args, **kwargs)
+    
+class HealthRecordViewSet(viewsets.ModelViewSet):
+    queryset = HealthRecord.objects.all()
+    serializer_class = HealthRecordSerializer
+    permission_classes = [IsAuthenticated]
+
+    def create(self, request, *args, **kwargs):
+        # Optional: Add logic here to deduct the 'vaccine_resource' 
+        # quantity from your Resource inventory when a vaccine is used.
+        return super().create(request, *args, **kwargs)
 
 class AnimalPurposeViewSet(viewsets.ModelViewSet):
     queryset = AnimalPurpose.objects.all()
