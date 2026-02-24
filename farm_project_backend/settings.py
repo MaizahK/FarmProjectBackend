@@ -43,14 +43,17 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'apps.users',
-    'apps.identity',
-    'apps.animals',
-    'apps.resources',
-    'apps.products',
     'rest_framework',
     'rest_framework_simplejwt',
     'rest_framework_simplejwt.token_blacklist',
+    'apps.animals',
+    'apps.finances',
+    'apps.identity',
+    'apps.inventory',
+    'apps.logs',
+    'apps.products',
+    'apps.resources',
+    'apps.users',
 ]
 
 REST_FRAMEWORK = {
