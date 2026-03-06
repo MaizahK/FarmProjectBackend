@@ -58,6 +58,11 @@ INSTALLED_APPS = [
     'apps.products',
     'apps.resources',
     'apps.users',
+    'django_cron'
+]
+
+CRON_CLASSES = [
+    "apps.finances.cron.MonthlyRecurringExpenseCronJob",
 ]
 
 REST_FRAMEWORK = {
@@ -69,6 +74,7 @@ REST_FRAMEWORK = {
     ),
 }
 
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 from datetime import timedelta
 SIMPLE_JWT = {
