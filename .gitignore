@@ -24,6 +24,7 @@ venv.bak/
 !/media/.gitkeep
 /static_root/
 /staticfiles/
+/assets/
 
 # --- IDEs / Editors ---
 .visualstudio
