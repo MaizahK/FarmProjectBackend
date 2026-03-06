@@ -16,6 +16,7 @@ pymysql.version_info = (2, 2, 4, "final", 0)
 pymysql.install_as_MySQLdb()
 
 from pathlib import Path
+import os
 
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -33,6 +34,9 @@ DEBUG = True
 
 ALLOWED_HOSTS = ["192.168.1.111", "0.0.0.0", "*"]
 APPEND_SLASH=False
+
+MEDIA_URL = '/assets/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'assets')
 
 # Application definition
 

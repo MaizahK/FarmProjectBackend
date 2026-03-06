@@ -38,6 +38,7 @@ class Animal(models.Model):
 
     tag_id = models.CharField(max_length=50, unique=True)
     name = models.CharField(max_length=100, blank=True)
+    image = models.ImageField(upload_to='animals', null=True, blank=True)
     species = models.CharField(max_length=50, choices=SPECIES_CHOICES)
     breed = models.CharField(max_length=100)
     notes = models.CharField(max_length=5000, blank=True)
