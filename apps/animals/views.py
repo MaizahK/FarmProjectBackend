@@ -11,6 +11,7 @@ class AnimalViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         queryset = Animal.objects.all()
+        # queryset = Animal.objects.filter(is_deleted=False)
         species = self.request.query_params.get("species")
 
         if species:
@@ -38,12 +39,19 @@ class AnimalViewSet(viewsets.ModelViewSet):
         )
 
     def perform_destroy(self, instance):
+        """Soft delete: Set is_deleted to True instead of removing from DB."""
         tag_id = instance.tag_id
-        instance.delete()
+        
+        # Logic change here
+        instance.is_deleted = True
+        instance.is_active = False 
+        instance.save()
+
+        # Log the action as usual
         Logger.write(
             user=self.request.user,
-            title="Animal Deleted",
-            description=f"Removed animal record: {tag_id}",
+            title="Animal Archived",
+            description=f"Soft-deleted animal record: {tag_id}",
             module="Livestock"
         )
 

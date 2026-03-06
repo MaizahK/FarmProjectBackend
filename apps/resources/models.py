@@ -12,6 +12,7 @@ class Resource(models.Model):
     name = models.CharField(max_length=200) # e.g., "Polio, Grass"
     quantity = models.CharField(max_length=200, blank=True)
     vendor = models.CharField(max_length=200, blank=True)
+    is_deleted = models.BooleanField(default=False)
     
     def __str__(self):
         return f"{self.name} ({self.resource_type.name})"

@@ -76,7 +76,9 @@ class ProductViewSet(viewsets.ModelViewSet):
 
     def perform_destroy(self, instance):
         desc = instance.description
-        instance.delete()
+        instance.is_deleted = True
+        instance.is_active = False 
+        instance.save()
         Logger.write(
             user=self.request.user,
             title="Product Deleted",

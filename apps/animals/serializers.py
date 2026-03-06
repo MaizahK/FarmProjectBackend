@@ -50,7 +50,7 @@ class AnimalSerializer(serializers.ModelSerializer):
             'gender', 'birth_date', 'weight', 'health_status', 
             'owner', 'owner_name', 'purpose', 'purpose_name', 
             'age', 'last_vet_check', 'notes', 'image',
-            'vaccination_records', 'health_records'
+            'vaccination_records', 'health_records', 'is_active', 'is_deleted'
         ]
         read_only_fields = ['owner']
 

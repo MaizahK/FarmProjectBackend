@@ -73,7 +73,9 @@ class ResourceViewSet(viewsets.ModelViewSet):
 
     def perform_destroy(self, instance):
         name = instance.name
-        instance.delete()
+        instance.is_deleted = True
+        instance.is_active = False 
+        instance.save()
         Logger.write(
             user=self.request.user,
             title="Resource Deleted",

@@ -51,6 +51,7 @@ class Animal(models.Model):
         default='healthy'
     )
     is_active = models.BooleanField(default=True)
+    is_deleted = models.BooleanField(default=False)
 
     owner = models.ForeignKey(
         settings.AUTH_USER_MODEL,
