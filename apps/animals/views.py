@@ -3,6 +3,7 @@ from rest_framework.permissions import IsAuthenticated
 from .serializers import *
 from .models import *
 from ..logs.utils.helper import Logger
+from ..inventory.utils import adjust_inventory_stock
 
 class AnimalViewSet(viewsets.ModelViewSet):
     queryset = Animal.objects.all()
@@ -29,6 +30,18 @@ class AnimalViewSet(viewsets.ModelViewSet):
             module="Livestock"
         )
 
+        if getattr(serializer, '_add_in_inventory', False):
+            adjust_inventory_stock(
+                user=self.request.user,
+                model_name="animal",
+                object_id=instance.id,
+                category=instance.species or "Animal",
+                item_name=instance.tag_id,
+                quantity=1,
+                unit="Units",
+                action="add",
+            )
+
     def perform_update(self, serializer):
         instance = serializer.save()
         Logger.write(
@@ -38,6 +51,18 @@ class AnimalViewSet(viewsets.ModelViewSet):
             module="Livestock"
         )
 
+        if getattr(serializer, '_add_in_inventory', False):
+            adjust_inventory_stock(
+                user=self.request.user,
+                model_name="animal",
+                object_id=instance.id,
+                category=instance.species or "Animal",
+                item_name=instance.tag_id,
+                quantity=1,
+                unit="Units",
+                action="add",
+            )
+
     def perform_destroy(self, instance):
         """Soft delete: Set is_deleted to True instead of removing from DB."""
         tag_id = instance.tag_id
@@ -46,6 +71,20 @@ class AnimalViewSet(viewsets.ModelViewSet):
         instance.is_deleted = True
         instance.is_active = False 
         instance.save()
+
+        # Optionally remove from inventory as well
+        add_inv = self.request.query_params.get("add_in_inventory")
+        if str(add_inv).lower() in ("1", "true", "yes", "on"):
+            adjust_inventory_stock(
+                user=self.request.user,
+                model_name="animal",
+                object_id=instance.id,
+                category=instance.species or "Animal",
+                item_name=instance.tag_id,
+                quantity=1,
+                unit="Units",
+                action="remove",
+            )
 
         # Log the action as usual
         Logger.write(

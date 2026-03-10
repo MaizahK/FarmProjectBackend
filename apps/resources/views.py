@@ -1,8 +1,10 @@
 from ..logs.utils.helper import Logger
+from ..inventory.utils import adjust_inventory_stock
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
 from .models import Resource, ResourceType
 from .serializers import ResourceSerializer, ResourceTypeSerializer
+
 
 class ResourceTypeViewSet(viewsets.ModelViewSet):
     queryset = ResourceType.objects.all()
@@ -37,6 +39,7 @@ class ResourceTypeViewSet(viewsets.ModelViewSet):
             module="Resources"
         )
 
+
 class ResourceViewSet(viewsets.ModelViewSet):
     queryset = Resource.objects.all()
     serializer_class = ResourceSerializer
@@ -62,6 +65,23 @@ class ResourceViewSet(viewsets.ModelViewSet):
             module="Resources"
         )
 
+        if getattr(serializer, '_add_in_inventory', False):
+            try:
+                qty = float(instance.quantity)
+            except (TypeError, ValueError):
+                qty = 0
+
+            adjust_inventory_stock(
+                user=self.request.user,
+                model_name="resource",
+                object_id=instance.id,
+                category=instance.resource_type.name,
+                item_name=instance.name,
+                quantity=qty,
+                unit="Units",
+                action="add",
+            )
+
     def perform_update(self, serializer):
         instance = serializer.save()
         Logger.write(
@@ -71,11 +91,47 @@ class ResourceViewSet(viewsets.ModelViewSet):
             module="Resources"
         )
 
+        if getattr(serializer, '_add_in_inventory', False):
+            try:
+                qty = float(instance.quantity)
+            except (TypeError, ValueError):
+                qty = 0
+
+            adjust_inventory_stock(
+                user=self.request.user,
+                model_name="resource",
+                object_id=instance.id,
+                category=instance.resource_type.name,
+                item_name=instance.name,
+                quantity=qty,
+                unit="Units",
+                action="add",
+            )
+
     def perform_destroy(self, instance):
         name = instance.name
         instance.is_deleted = True
-        instance.is_active = False 
+        instance.is_active = False
         instance.save()
+
+        add_inv = self.request.query_params.get("add_in_inventory")
+        if str(add_inv).lower() in ("1", "true", "yes", "on"):
+            try:
+                qty = float(instance.quantity)
+            except (TypeError, ValueError):
+                qty = 0
+
+            adjust_inventory_stock(
+                user=self.request.user,
+                model_name="resource",
+                object_id=instance.id,
+                category=instance.resource_type.name,
+                item_name=instance.name,
+                quantity=qty,
+                unit="Units",
+                action="remove",
+            )
+
         Logger.write(
             user=self.request.user,
             title="Resource Deleted",

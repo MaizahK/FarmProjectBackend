@@ -40,6 +40,7 @@ class AnimalSerializer(serializers.ModelSerializer):
     owner_name = serializers.ReadOnlyField(source='owner.username')
     purpose_name = serializers.ReadOnlyField(source='purpose.name')
     age = serializers.SerializerMethodField()
+    add_in_inventory = serializers.BooleanField(write_only=True, required=False, default=False)
     vaccination_records = VaccinationRecordSerializer(many=True, read_only=True)
     health_records = HealthRecordSerializer(many=True, read_only=True)
 
@@ -50,7 +51,7 @@ class AnimalSerializer(serializers.ModelSerializer):
             'gender', 'birth_date', 'weight', 'health_status', 
             'owner', 'owner_name', 'purpose', 'purpose_name', 
             'age', 'last_vet_check', 'notes', 'image',
-            'vaccination_records', 'health_records', 'is_active', 'is_deleted'
+            'vaccination_records', 'health_records', 'add_in_inventory', 'is_active', 'is_deleted'
         ]
         read_only_fields = ['owner']
 
@@ -62,3 +63,13 @@ class AnimalSerializer(serializers.ModelSerializer):
             months = (delta.days % 365) // 30
             return f"{years} years, {months} months"
         return "Unknown"
+
+    def create(self, validated_data):
+        # Ensure transient `add_in_inventory` is not passed into the model create()
+        self._add_in_inventory = validated_data.pop('add_in_inventory', False)
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        # Ensure transient `add_in_inventory` is not passed into the model update()
+        self._add_in_inventory = validated_data.pop('add_in_inventory', False)
+        return super().update(instance, validated_data)
