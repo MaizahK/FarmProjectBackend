@@ -43,6 +43,7 @@ class AnimalSerializer(serializers.ModelSerializer):
     add_in_inventory = serializers.BooleanField(write_only=True, required=False, default=False)
     vaccination_records = VaccinationRecordSerializer(many=True, read_only=True)
     health_records = HealthRecordSerializer(many=True, read_only=True)
+    is_active = serializers.BooleanField(required=False, default=True)
 
     class Meta:
         model = Animal
