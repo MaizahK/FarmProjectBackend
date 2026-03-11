@@ -81,7 +81,7 @@ class ProductViewSet(viewsets.ModelViewSet):
                 category=instance.product_type.name,
                 item_name=instance.description,
                 quantity=qty,
-                unit="Units",
+                unit=instance.unit,
                 action="add",
             )
 

@@ -13,7 +13,7 @@ class ResourceSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Resource
-        fields = ['id', 'resource_type', 'resource_type_name', 'name', 'vendor', 'quantity', 'add_in_inventory', 'is_deleted']
+        fields = ['id', 'resource_type', 'resource_type_name', 'name', 'vendor', 'quantity', 'unit', 'add_in_inventory', 'is_deleted']
 
 
     def create(self, validated_data):

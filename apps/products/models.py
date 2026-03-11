@@ -10,7 +10,11 @@ class ProductType(models.Model):
 class Product(models.Model):
     product_type = models.ForeignKey(ProductType, on_delete=models.CASCADE, related_name='items')
     description = models.CharField(max_length=200, blank=True)
-    quantity = models.CharField(max_length=200)
+    quantity = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    unit = models.CharField(
+        max_length=50, 
+        choices=[("Liters", "Liters"), ("KGs", "KGs"), ("Units", "Units")]
+    )
     is_deleted = models.BooleanField(default=False)
     animal = models.ForeignKey(
         'animals.Animal', 

@@ -78,7 +78,7 @@ class ResourceViewSet(viewsets.ModelViewSet):
                 category=instance.resource_type.name,
                 item_name=instance.name,
                 quantity=qty,
-                unit="Units",
+                unit=instance.unit,
                 action="add",
             )
 

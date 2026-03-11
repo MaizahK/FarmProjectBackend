@@ -6,5 +6,5 @@ router = DefaultRouter()
 router.register(r'activity-logs', ActivityLogViewSet, basename='activity-log')
 
 urlpatterns = [
-    path('', include(router.urls)),
+    path('api/', include(router.urls)),
 ]
