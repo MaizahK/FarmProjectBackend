@@ -1,48 +1,49 @@
-from rest_framework import viewsets
-from rest_framework.decorators import action
+from rest_framework import serializers
+from rest_framework import viewsets, status
+from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-
-from .models import Inventory
-from .serializers import InventorySerializer
+from .models import Inventory, InventoryTransaction
+from .serializers import InventorySerializer, InventoryTransactionSerializer
 from .utils import adjust_inventory_stock
-from ..logs.utils.helper import Logger
 
-
-class InventoryViewSet(viewsets.ModelViewSet):
+class InventoryViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Inventory.objects.all()
     serializer_class = InventorySerializer
     permission_classes = [IsAuthenticated]
 
-    @action(detail=False, methods=["post"])
-    def adjust_stock(self, request):
-        """Adjust inventory for a given object.
+class InventoryTransactionViewSet(viewsets.ModelViewSet):
+    queryset = InventoryTransaction.objects.all()
+    serializer_class = InventoryTransactionSerializer
+    permission_classes = [IsAuthenticated]
 
-        Payload example:
-        {
-            "model_name": "resource",  # or "product" or "animal"
-            "object_id": 1,
-            "category": "Vaccine",
-            "item_name": "Booster",
-            "quantity": 10,
-            "unit": "Units",
-            "action": "add" # or "remove"
-        }
-        """
-        model_name = request.data.get('model_name')
-        obj_id = request.data.get('object_id')
-        category = request.data.get('category')
-        item_name = request.data.get('item_name')
-        qty = float(request.data.get('quantity', 0))
-        mode = request.data.get('action')
-        unit = request.data.get('unit')
-
-        return adjust_inventory_stock(
-            user=request.user,
-            model_name=model_name,
-            object_id=obj_id,
-            category=category,
-            item_name=item_name,
-            quantity=qty,
-            unit=unit,
-            action=mode,
+    def perform_create(self, serializer):
+        # 1. Save the transaction record
+        transaction = serializer.save()
+        
+        # 2. Determine if we are adding or removing based on type
+        # Production, Purchase, Adjustment (pos), Transfer (in) = ADD
+        # Consumption, Sale, Adjustment (neg), Transfer (out) = REMOVE
+        
+        add_types = ['PRODUCTION', 'PURCHASE']
+        remove_types = ['CONSUMPTION', 'SALE']
+        
+        # Defaulting logic for this example
+        action = "add" if transaction.transaction_type in add_types else "remove"
+        
+        # 3. Call utility to update the actual Inventory balance
+        success = adjust_inventory_stock(
+            user=self.request.user,
+            model_name=transaction.content_type.model,
+            object_id=transaction.object_id,
+            category="General", # You can pass more specific logic here
+            item_name=f"Item-{transaction.object_id}",
+            quantity=transaction.quantity,
+            unit="Units",
+            action=action
         )
+
+        if not success:
+            # Note: In a production app, you'd use a database transaction.atomic() 
+            # to roll back the Transaction record if stock adjustment fails.
+            transaction.delete()
+            raise serializers.ValidationError({"error": "Insufficient stock for this transaction."})
