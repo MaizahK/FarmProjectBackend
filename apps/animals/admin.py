@@ -3,6 +3,5 @@ from .models import *
 
 # Register your models here.
 admin.site.register(Animal)
-admin.site.register(VaccinationRecord)
-admin.site.register(HealthRecord)
+admin.site.register(AnimalHistory)
 admin.site.register(AnimalPurpose)

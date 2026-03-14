@@ -1,63 +1,41 @@
 from rest_framework import serializers
 from django.utils import timezone
-from .models import *
+from .models import Animal, AnimalPurpose, AnimalHistory
 
 class AnimalPurposeSerializer(serializers.ModelSerializer):
     class Meta:
         model = AnimalPurpose
         fields = ['id', 'name', 'species']
 
-class VaccinationRecordSerializer(serializers.ModelSerializer):
-    animal_tag = serializers.ReadOnlyField(source='animal.tag_id')
-    vaccine_name = serializers.ReadOnlyField(source='vaccine_resource.name')
-
-    class Meta:
-        model = VaccinationRecord
-        fields = [
-            'id', 'animal', 'animal_tag', 'vaccine_resource', 
-            'vaccine_name', 'date_administered', 'administered_by', 
-            'batch_number', 'next_due_date'
-        ]
-
-class HealthRecordSerializer(serializers.ModelSerializer):
-    # Pulling the tag_id from the related Animal model for display
+class AnimalHistorySerializer(serializers.ModelSerializer):
     animal_tag = serializers.ReadOnlyField(source='animal.tag_id')
 
     class Meta:
-        model = HealthRecord
+        model = AnimalHistory
         fields = [
-            'id', 
-            'animal', 
-            'animal_tag', 
-            'date_checkup', 
-            'description', 
-            'checked_by', 
-            'next_due_date'
+            'id', 'animal', 'animal_tag', 'event_name', 'record_type', 
+            'description', 'event_date', 'performed_by', 'next_due_date'
         ]
 
 class AnimalSerializer(serializers.ModelSerializer):
-    # Read-only fields for the API response
     owner_name = serializers.ReadOnlyField(source='owner.username')
     purpose_name = serializers.ReadOnlyField(source='purpose.name')
     age = serializers.SerializerMethodField()
+    history = AnimalHistorySerializer(many=True, read_only=True)
     add_in_inventory = serializers.BooleanField(write_only=True, required=False, default=False)
-    vaccination_records = VaccinationRecordSerializer(many=True, read_only=True)
-    health_records = HealthRecordSerializer(many=True, read_only=True)
-    is_active = serializers.BooleanField(required=False, default=True)
 
     class Meta:
         model = Animal
         fields = [
-            'id', 'tag_id', 'name', 'species', 'breed', 
-            'gender', 'birth_date', 'weight', 'health_status', 
-            'owner', 'owner_name', 'purpose', 'purpose_name', 
-            'age', 'last_vet_check', 'notes', 'image',
-            'vaccination_records', 'health_records', 'add_in_inventory', 'is_active', 'is_deleted'
+            'id', 'tag_id', 'name', 'species', 'breed', 'gender', 
+            'birth_date', 'weight', 'health_status', 'status', 'owner', 
+            'owner_name', 'purpose', 'purpose_name', 'age', 
+            'last_vet_check', 'notes', 'image', 'history', 
+            'add_in_inventory', 'is_active', 'is_deleted'
         ]
         read_only_fields = ['owner']
 
     def get_age(self, obj):
-        """Calculates age in months or years based on birth_date."""
         if obj.birth_date:
             delta = timezone.now().date() - obj.birth_date
             years = delta.days // 365
@@ -66,11 +44,9 @@ class AnimalSerializer(serializers.ModelSerializer):
         return "Unknown"
 
     def create(self, validated_data):
-        # Ensure transient `add_in_inventory` is not passed into the model create()
         self._add_in_inventory = validated_data.pop('add_in_inventory', False)
         return super().create(validated_data)
 
     def update(self, instance, validated_data):
-        # Ensure transient `add_in_inventory` is not passed into the model update()
         self._add_in_inventory = validated_data.pop('add_in_inventory', False)
         return super().update(instance, validated_data)

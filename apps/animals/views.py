@@ -1,203 +1,60 @@
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
-from .serializers import *
-from .models import *
+from .serializers import AnimalSerializer, AnimalPurposeSerializer, AnimalHistorySerializer
+from .models import Animal, AnimalPurpose, AnimalHistory
 from ..logs.utils.helper import Logger
 from ..inventory.utils import adjust_inventory_stock
 
 class AnimalViewSet(viewsets.ModelViewSet):
-    queryset = Animal.objects.all()
+    queryset = Animal.objects.filter(is_deleted=False)
     permission_classes = [IsAuthenticated]
     serializer_class = AnimalSerializer
 
     def get_queryset(self):
-        queryset = Animal.objects.all()
-        # queryset = Animal.objects.filter(is_deleted=False)
+        queryset = super().get_queryset()
         species = self.request.query_params.get("species")
-
+        status = self.request.query_params.get("status")
         if species:
             queryset = queryset.filter(species__iexact=species)
-
+        if status:
+            queryset = queryset.filter(status__iexact=status)
         return queryset
 
     def perform_create(self, serializer):
-        # Automatically set the owner to the user making the request (from JWT)
         instance = serializer.save(owner=self.request.user)
-        Logger.write(
-            user=self.request.user,
-            title="Animal Registered",
-            description=f"Registered new animal: {instance.tag_id} ({instance.species})",
-            module="Livestock"
-        )
-
+        Logger.write(self.request.user, "Animal Registered", f"Registered: {instance.tag_id}", "Livestock")
         if getattr(serializer, '_add_in_inventory', False):
-            adjust_inventory_stock(
-                user=self.request.user,
-                model_name="animal",
-                object_id=instance.id,
-                category=instance.species or "Animal",
-                item_name=instance.tag_id,
-                quantity=1,
-                unit="Units",
-                action="add",
-            )
+            self._adjust_inventory(instance, "add")
 
     def perform_update(self, serializer):
         instance = serializer.save()
-        Logger.write(
-            user=self.request.user,
-            title="Animal Updated",
-            description=f"Updated details for animal: {instance.tag_id}",
-            module="Livestock"
-        )
-
+        Logger.write(self.request.user, "Animal Updated", f"Updated: {instance.tag_id}", "Livestock")
         if getattr(serializer, '_add_in_inventory', False):
-            adjust_inventory_stock(
-                user=self.request.user,
-                model_name="animal",
-                object_id=instance.id,
-                category=instance.species or "Animal",
-                item_name=instance.tag_id,
-                quantity=1,
-                unit="Units",
-                action="add",
-            )
+            self._adjust_inventory(instance, "add")
 
     def perform_destroy(self, instance):
-        """Soft delete: Set is_deleted to True instead of removing from DB."""
-        tag_id = instance.tag_id
-        
-        # Logic change here
         instance.is_deleted = True
-        instance.is_active = False 
+        instance.is_active = False
         instance.save()
+        Logger.write(self.request.user, "Animal Archived", f"Soft-deleted: {instance.tag_id}", "Livestock")
 
-        # Optionally remove from inventory as well
-        add_inv = self.request.query_params.get("add_in_inventory")
-        if str(add_inv).lower() in ("1", "true", "yes", "on"):
-            adjust_inventory_stock(
-                user=self.request.user,
-                model_name="animal",
-                object_id=instance.id,
-                category=instance.species or "Animal",
-                item_name=instance.tag_id,
-                quantity=1,
-                unit="Units",
-                action="remove",
-            )
-
-        # Log the action as usual
-        Logger.write(
-            user=self.request.user,
-            title="Animal Archived",
-            description=f"Soft-deleted animal record: {tag_id}",
-            module="Livestock"
+    def _adjust_inventory(self, instance, action):
+        adjust_inventory_stock(
+            user=self.request.user, model_name="animal", object_id=instance.id,
+            category=instance.species, item_name=instance.tag_id,
+            quantity=1, unit="Units", action=action
         )
 
-class VaccinationRecordViewSet(viewsets.ModelViewSet):
-    queryset = VaccinationRecord.objects.all()
-    serializer_class = VaccinationRecordSerializer
+class AnimalHistoryViewSet(viewsets.ModelViewSet):
+    queryset = AnimalHistory.objects.all()
+    serializer_class = AnimalHistorySerializer
     permission_classes = [IsAuthenticated]
 
     def perform_create(self, serializer):
         instance = serializer.save()
-        Logger.write(
-            user=self.request.user,
-            title="Vaccination Added",
-            description=f"Administered {instance.vaccine_resource.name} to {instance.animal.tag_id}",
-            module="Livestock"
-        )
-
-    def perform_update(self, serializer):
-        instance = serializer.save()
-        Logger.write(
-            user=self.request.user,
-            title="Vaccination Updated",
-            description=f"Updated vaccination record for {instance.animal.tag_id}",
-            module="Livestock"
-        )
-
-    def perform_destroy(self, instance):
-        info = f"{instance.vaccine_resource.name} for {instance.animal.tag_id}"
-        instance.delete()
-        Logger.write(
-            user=self.request.user,
-            title="Vaccination Deleted",
-            description=f"Deleted record: {info}",
-            module="Livestock"
-        )
-    
-class HealthRecordViewSet(viewsets.ModelViewSet):
-    queryset = HealthRecord.objects.all()
-    serializer_class = HealthRecordSerializer
-    permission_classes = [IsAuthenticated]
-
-    def perform_create(self, serializer):
-        instance = serializer.save()
-        Logger.write(
-            user=self.request.user,
-            title="Health Checkup Added",
-            description=f"Recorded checkup for {instance.animal.tag_id}",
-            module="Livestock"
-        )
-
-    def perform_update(self, serializer):
-        instance = serializer.save()
-        Logger.write(
-            user=self.request.user,
-            title="Health Checkup Updated",
-            description=f"Updated health record for {instance.animal.tag_id}",
-            module="Livestock"
-        )
-
-    def perform_destroy(self, instance):
-        animal_tag = instance.animal.tag_id
-        instance.delete()
-        Logger.write(
-            user=self.request.user,
-            title="Health Checkup Deleted",
-            description=f"Deleted health record for {animal_tag}",
-            module="Livestock"
-        )
+        Logger.write(self.request.user, "History Added", f"New {instance.record_type} for {instance.animal.tag_id}", "Livestock")
 
 class AnimalPurposeViewSet(viewsets.ModelViewSet):
     queryset = AnimalPurpose.objects.all()
     serializer_class = AnimalPurposeSerializer
     permission_classes = [IsAuthenticated]
-
-    def get_queryset(self):
-        queryset = AnimalPurpose.objects.all()
-        species = self.request.query_params.get("species")
-
-        if species:
-            queryset = queryset.filter(species__iexact=species)
-
-        return queryset
-
-    def perform_create(self, serializer):
-        instance = serializer.save()
-        Logger.write(
-            user=self.request.user,
-            title="Animal Purpose Created",
-            description=f"Created purpose: {instance.name} for {instance.species}",
-            module="Livestock"
-        )
-
-    def perform_update(self, serializer):
-        instance = serializer.save()
-        Logger.write(
-            user=self.request.user,
-            title="Animal Purpose Updated",
-            description=f"Updated purpose: {instance.name}",
-            module="Livestock"
-        )
-
-    def perform_destroy(self, instance):
-        name = instance.name
-        instance.delete()
-        Logger.write(
-            user=self.request.user,
-            title="Animal Purpose Deleted",
-            description=f"Deleted purpose: {name}",
-            module="Livestock"
-        )

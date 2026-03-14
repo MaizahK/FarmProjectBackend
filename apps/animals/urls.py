@@ -5,8 +5,7 @@ from .views import *
 
 router = DefaultRouter()
 router.register(r'animals', AnimalViewSet)
-router.register(r'vaccination-records', VaccinationRecordViewSet)
-router.register(r'health-records', HealthRecordViewSet)
+router.register(r'animal-history', AnimalHistoryViewSet)
 router.register(r'animal-purposes', AnimalPurposeViewSet)
 
 urlpatterns = [
