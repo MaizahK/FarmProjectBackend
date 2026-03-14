@@ -32,7 +32,7 @@ SECRET_KEY = 'django-insecure-^p!_oxq%@=_t%73ck*9xv6kf$)@m+sl83x5_r*_&_iyv=otj#1
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ["192.168.1.111", "0.0.0.0", "*"]
+ALLOWED_HOSTS = ["https://8nnv9qmp-8000.inc1.devtunnels.ms/","192.168.1.111", "0.0.0.0", "*"]
 APPEND_SLASH=False
 
 MEDIA_URL = '/assets/'

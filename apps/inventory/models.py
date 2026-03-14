@@ -3,13 +3,12 @@ from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 
 class Inventory(models.Model):
+    # Link to the Type of content (e.g., Animal Model, Resource Model)
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
-    object_id = models.PositiveIntegerField()
-    item = GenericForeignKey('content_type', 'object_id')
     
-    # Hierarchical Details
-    category_name = models.CharField(max_length=100) # e.g., "Vaccine", "Feed", "Cattle"
-    item_name = models.CharField(max_length=255)     # e.g., "Booster", "Grass", "Cow-01"
+    # We remove object_id from uniqueness to allow grouping
+    category_name = models.CharField(max_length=100) # e.g., "Cow", "Feed", "Vaccine"
+    item_name = models.CharField(max_length=255)     # e.g., "Angus", "Corn Sacks", "Booster"
     
     quantity = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
     unit = models.CharField(
@@ -19,11 +18,11 @@ class Inventory(models.Model):
     last_updated = models.DateTimeField(auto_now=True)
 
     class Meta:
-        unique_together = ('content_type', 'object_id')
+        # Now unique based on the NAME and CATEGORY, not the specific ID
+        unique_together = ('content_type', 'category_name', 'item_name')
 
     def __str__(self):
         return f"[{self.category_name}] {self.item_name} - {self.quantity} {self.unit}"
-
 class InventoryTransaction(models.Model):
     TRANSACTION_TYPES = [
         ('PRODUCTION', 'Production'),
