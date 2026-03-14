@@ -68,7 +68,7 @@ class ProductViewSet(viewsets.ModelViewSet):
             module="Products"
         )
 
-        if getattr(serializer, '_add_in_inventory', False):
+        if getattr(serializer, '_add_to_inventory', False):
             try:
                 qty = float(instance.quantity)
             except (TypeError, ValueError):
@@ -94,7 +94,7 @@ class ProductViewSet(viewsets.ModelViewSet):
             module="Products"
         )
 
-        if getattr(serializer, '_add_in_inventory', False):
+        if getattr(serializer, '_add_to_inventory', False):
             try:
                 qty = float(instance.quantity)
             except (TypeError, ValueError):
@@ -117,7 +117,7 @@ class ProductViewSet(viewsets.ModelViewSet):
         instance.is_active = False 
         instance.save()
 
-        add_inv = self.request.query_params.get("add_in_inventory")
+        add_inv = self.request.query_params.get("add_to_inventory")
         if str(add_inv).lower() in ("1", "true", "yes", "on"):
             try:
                 qty = float(instance.quantity)

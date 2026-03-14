@@ -22,7 +22,8 @@ class AnimalSerializer(serializers.ModelSerializer):
     purpose_name = serializers.ReadOnlyField(source='purpose.name')
     age = serializers.SerializerMethodField()
     history = AnimalHistorySerializer(many=True, read_only=True)
-    add_in_inventory = serializers.BooleanField(write_only=True, required=False, default=False)
+    is_active = serializers.BooleanField(read_only=True)
+    add_to_inventory = serializers.BooleanField(write_only=True, required=False, default=False)
 
     class Meta:
         model = Animal
@@ -31,7 +32,7 @@ class AnimalSerializer(serializers.ModelSerializer):
             'birth_date', 'weight', 'health_status', 'status', 'owner', 
             'owner_name', 'purpose', 'purpose_name', 'age', 
             'last_vet_check', 'notes', 'image', 'history', 
-            'add_in_inventory', 'is_active', 'is_deleted'
+            'add_to_inventory', 'is_active', 'is_deleted'
         ]
         read_only_fields = ['owner']
 
@@ -44,9 +45,9 @@ class AnimalSerializer(serializers.ModelSerializer):
         return "Unknown"
 
     def create(self, validated_data):
-        self._add_in_inventory = validated_data.pop('add_in_inventory', False)
+        self._add_to_inventory = validated_data.pop('add_to_inventory', False)
         return super().create(validated_data)
 
     def update(self, instance, validated_data):
-        self._add_in_inventory = validated_data.pop('add_in_inventory', False)
+        self._add_to_inventory = validated_data.pop('add_to_inventory', False)
         return super().update(instance, validated_data)

@@ -4,6 +4,8 @@ from .serializers import AnimalSerializer, AnimalPurposeSerializer, AnimalHistor
 from .models import Animal, AnimalPurpose, AnimalHistory
 from ..logs.utils.helper import Logger
 from ..inventory.utils import adjust_inventory_stock
+from ..finances.utils import process_inventory_purchase
+
 
 class AnimalViewSet(viewsets.ModelViewSet):
     queryset = Animal.objects.filter(is_deleted=False)
@@ -22,14 +24,21 @@ class AnimalViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         instance = serializer.save(owner=self.request.user)
-        Logger.write(self.request.user, "Animal Registered", f"Registered: {instance.tag_id}", "Livestock")
-        if getattr(serializer, '_add_in_inventory', False):
-            self._adjust_inventory(instance, "add")
+        if self.request.data.get('add_to_inventory'):
+            process_inventory_purchase(
+                user=self.request.user,
+                model_name='animal',
+                object_id=instance.id,
+                amount=self.request.data.get('purchase_price', 0),
+                category=instance.species,
+                item_name=instance.tag_id,
+                unit="Units"
+            )
 
     def perform_update(self, serializer):
         instance = serializer.save()
         Logger.write(self.request.user, "Animal Updated", f"Updated: {instance.tag_id}", "Livestock")
-        if getattr(serializer, '_add_in_inventory', False):
+        if getattr(serializer, '_add_to_inventory', False):
             self._adjust_inventory(instance, "add")
 
     def perform_destroy(self, instance):
