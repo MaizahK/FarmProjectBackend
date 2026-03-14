@@ -29,6 +29,7 @@ class AnimalViewSet(viewsets.ModelViewSet):
                 user=self.request.user,
                 model_name='animal',
                 object_id=instance.id,
+                qty=1,
                 amount=self.request.data.get('purchase_price', 0),
                 category=instance.species,
                 item_name=instance.tag_id,

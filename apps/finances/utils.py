@@ -4,15 +4,13 @@ from .models import FinancialTransaction, Expense, Sale
 from ..inventory.models import InventoryTransaction
 from ..inventory.utils import adjust_inventory_stock
 from ..logs.utils.helper import Logger
+from ..animals.models import Animal # Assuming this path
 
 @transaction.atomic
-def process_inventory_purchase(user, model_name, object_id, amount, category, item_name, unit="Units"):
-    """
-    Full Purchase Flow using Collective Inventory
-    """
+def process_inventory_purchase(user, model_name, object_id, qty, amount, category, item_name, unit="Units"):
     try:
-        ctype = ContentType.objects.get(model=model_name.lower())
-        qty = 1 # Purchase usually adds 1 unit/animal
+        model_name = model_name.lower()
+        ctype = ContentType.objects.get(model=model_name)
         
         # 1. Expense Record
         expense = Expense.objects.create(
@@ -21,9 +19,8 @@ def process_inventory_purchase(user, model_name, object_id, amount, category, it
             category_name=category,
             amount=amount,
             is_paid=True,
-            description=f"Purchase of {item_name} ({category})"
+            description=f"Purchase of {item_name}"
         )
-        Logger.write(user, "Expense Created", f"Spent {amount} on {item_name}", "Finance")
 
         # 2. Financial Ledger
         FinancialTransaction.objects.create(
@@ -33,23 +30,23 @@ def process_inventory_purchase(user, model_name, object_id, amount, category, it
             reference_type=ContentType.objects.get_for_model(expense),
             reference_id=expense.id
         )
-        Logger.write(user, "Financial Ledger Updated", f"Recorded expense for {category}", "Finance")
 
-        # 3. Inventory Transaction (Movement Log)
+        # 3. Movement Log (Always individual for history)
         InventoryTransaction.objects.create(
             content_type=ctype,
-            object_id=object_id, # Link to specific animal/resource
+            object_id=object_id,
             transaction_type='PURCHASE',
             quantity=qty,
-            description=f"Collective stock entry for {item_name}",
+            description=f"Buying {item_name}",
             reference_type=ContentType.objects.get_for_model(expense),
             reference_id=expense.id
         )
 
-        # 4. Use Utils to update Collective Inventory
+        # 4. Inventory Balance (Hybrid Logic)
         adjust_inventory_stock(
             user=user,
             model_name=model_name,
+            object_id=object_id, # Passed to util which decides whether to use it or 0
             category=category,
             item_name=item_name,
             quantity=qty,
@@ -59,14 +56,11 @@ def process_inventory_purchase(user, model_name, object_id, amount, category, it
         
         return True
     except Exception as e:
-        print(f"Error: {e}")
+        print(f"Purchase Flow Error: {e}")
         return False
 
 @transaction.atomic
 def process_full_sale(user, sale_instance):
-    """
-    Full Sale Flow using Collective Inventory
-    """
     # 1. Financial Ledger (Income)
     FinancialTransaction.objects.create(
         type='INCOME',
@@ -75,7 +69,6 @@ def process_full_sale(user, sale_instance):
         reference_type=ContentType.objects.get_for_model(sale_instance),
         reference_id=sale_instance.id
     )
-    Logger.write(user, "Income Recorded", f"Earned {sale_instance.total_amount}", "Finance")
 
     # 2. Inventory Transaction Log
     InventoryTransaction.objects.create(
@@ -83,16 +76,31 @@ def process_full_sale(user, sale_instance):
         object_id=sale_instance.object_id,
         transaction_type='SALE',
         quantity=sale_instance.quantity,
-        description=f"Sale of {sale_instance.quantity} units"
+        description=f"Sold {sale_instance.item}"
     )
 
-    # 3. Reduce Collective Inventory
+    # 3. Hybrid Reduction
+    model_name = sale_instance.content_type.model
+    
+    # Determine item details for logic
+    if model_name == 'animal':
+        category = getattr(sale_instance.item, 'species', 'Livestock')
+        item_name = getattr(sale_instance.item, 'tag_id', 'Unknown')
+        # Mark animal as sold in the actual Animal model
+        Animal.objects.filter(id=sale_instance.object_id).update(status='sold', is_active=False)
+    else:
+        category = getattr(sale_instance.item, 'category', 'General')
+        item_name = getattr(sale_instance.item, 'name', 'Product')
+
     adjust_inventory_stock(
         user=user,
-        model_name=sale_instance.content_type.model,
-        category=getattr(sale_instance.item, 'species', 'General'),
-        item_name=getattr(sale_instance.item, 'breed', 'Product'),
+        model_name=model_name,
+        object_id=sale_instance.object_id,
+        category=category,
+        item_name=item_name,
         quantity=sale_instance.quantity,
         unit="Units",
         action="remove"
     )
+    
+    Logger.write(user, "Sale Completed", f"Processed sale for {item_name}", "Finance")
