@@ -37,6 +37,7 @@ def process_inventory_purchase(user, model_name, object_id, qty, amount, categor
             object_id=object_id,
             transaction_type='PURCHASE',
             quantity=qty,
+            unit=unit,
             description=f"Buying {item_name}",
             reference_type=ContentType.objects.get_for_model(expense),
             reference_id=expense.id
@@ -75,6 +76,7 @@ def process_inventory_production(user, model_name, object_id, qty, category, ite
             object_id=object_id,
             transaction_type='PRODUCTION', # Or 'HARVEST' depending on your choices
             quantity=qty,
+            unit=unit,
             description=f"Produced/Collected {qty} {unit} of {item_name}",
         )
 

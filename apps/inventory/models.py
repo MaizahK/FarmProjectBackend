@@ -36,12 +36,17 @@ class InventoryTransaction(models.Model):
         ('TRANSFER', 'Transfer'),
     ]
 
-    # The Item being moved (Animal, Resource, Product)
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, related_name="inventory_items")
     object_id = models.PositiveIntegerField()
     item = GenericForeignKey('content_type', 'object_id')
 
-    # Where this transaction came from (e.g., a specific Sale ID or Production ID)
+    # --- Added Metadata Fields ---
+    unit = models.CharField(
+        max_length=50, 
+        choices=[("Liters", "Liters"), ("KGs", "KGs"), ("Units", "Units")],
+        default="Units"
+    )
+
     reference_type = models.ForeignKey(ContentType, on_delete=models.SET_NULL, null=True, blank=True, related_name="transaction_references")
     reference_id = models.PositiveIntegerField(null=True, blank=True)
     reference_object = GenericForeignKey('reference_type', 'reference_id')
@@ -55,4 +60,4 @@ class InventoryTransaction(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"{self.transaction_type} - {self.quantity} for {self.object_id}"
+        return f"{self.transaction_type}: {self.item_name} ({self.quantity} {self.unit})"

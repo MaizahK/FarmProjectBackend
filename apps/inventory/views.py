@@ -5,6 +5,7 @@ from rest_framework.permissions import IsAuthenticated
 from .models import Inventory, InventoryTransaction
 from .serializers import InventorySerializer, InventoryTransactionSerializer
 from .utils import adjust_inventory_stock
+from django.db import transaction as db_transaction
 
 class InventoryViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Inventory.objects.all()
@@ -16,34 +17,32 @@ class InventoryTransactionViewSet(viewsets.ModelViewSet):
     serializer_class = InventoryTransactionSerializer
     permission_classes = [IsAuthenticated]
 
-    def perform_create(self, serializer):
-        # 1. Save the transaction record
-        transaction = serializer.save()
-        
-        # 2. Determine if we are adding or removing based on type
-        # Production, Purchase, Adjustment (pos), Transfer (in) = ADD
-        # Consumption, Sale, Adjustment (neg), Transfer (out) = REMOVE
-        
-        add_types = ['PRODUCTION', 'PURCHASE']
-        remove_types = ['CONSUMPTION', 'SALE']
-        
-        # Defaulting logic for this example
-        action = "add" if transaction.transaction_type in add_types else "remove"
-        
-        # 3. Call utility to update the actual Inventory balance
-        success = adjust_inventory_stock(
-            user=self.request.user,
-            model_name=transaction.content_type.model,
-            object_id=transaction.object_id,
-            category="General", # You can pass more specific logic here
-            item_name=f"Item-{transaction.object_id}",
-            quantity=transaction.quantity,
-            unit="Units",
-            action=action
-        )
+    queryset = InventoryTransaction.objects.all()
+    serializer_class = InventoryTransactionSerializer
+    permission_classes = [IsAuthenticated]
 
-        if not success:
-            # Note: In a production app, you'd use a database transaction.atomic() 
-            # to roll back the Transaction record if stock adjustment fails.
-            transaction.delete()
-            raise serializers.ValidationError({"error": "Insufficient stock for this transaction."})
+    def perform_create(self, serializer):
+        with db_transaction.atomic():
+            # 1. This now works because the extra fields were popped in the serializer
+            inv_trans = serializer.save()
+            
+            # 2. Logic to determine Add/Remove
+            add_types = ['PRODUCTION', 'PURCHASE']
+            action = "add" if inv_trans.transaction_type in add_types else "remove"
+            
+            # 3. Access the popped values stored on the serializer instance
+            success = adjust_inventory_stock(
+                user=self.request.user,
+                model_name=inv_trans.content_type.model,
+                object_id=inv_trans.object_id,
+                category=getattr(serializer, '_category_name', 'General'),
+                item_name=getattr(serializer, '_item_name', 'Unknown'),
+                quantity=inv_trans.quantity,
+                unit=getattr(serializer, '_unit', 'Units'),
+                action=action
+            )
+
+            if not success:
+                raise serializers.ValidationError({
+                    "error": "Insufficient stock to complete this transaction."
+                })

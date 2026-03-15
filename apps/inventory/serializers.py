@@ -18,10 +18,17 @@ class InventoryTransactionSerializer(serializers.ModelSerializer):
         required=False,
         allow_null=True
     )
+    category_name = serializers.CharField(write_only=True)
+    item_name = serializers.CharField(write_only=True)
 
     class Meta:
         model = InventoryTransaction
-        fields = [
-            'id', 'content_type', 'object_id', 'reference_type', 'reference_id',
-            'transaction_type', 'quantity', 'description', 'notes', 'created_at'
-        ]
+        fields = '__all__'
+
+
+    def create(self, validated_data):
+        # Pop the extra values so they don't cause a database error
+        self._category_name = validated_data.pop('category_name', 'General')
+        self._item_name = validated_data.pop('item_name', 'Unknown')
+        
+        return super().create(validated_data)
