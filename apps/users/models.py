@@ -4,6 +4,11 @@ from django.db import models
 class Role(models.Model):
     name = models.CharField(max_length=50, unique=True) # e.g., 'Admin', 'Farmer', 'Vet'
     description = models.TextField(blank=True)
+    permissions = models.ManyToManyField(
+        'Permission', 
+        through='RolePermissionMapping', 
+        related_name='roles'
+    )
 
     def __str__(self):
         return self.name
@@ -23,8 +28,16 @@ class Permission(models.Model):
         return f"{self.method} {self.path}"
 
 class RolePermissionMapping(models.Model):
-    role = models.ForeignKey(Role, on_delete=models.CASCADE, related_name='permissions')
-    permission = models.ForeignKey(Permission, on_delete=models.CASCADE)
+    role = models.ForeignKey(
+        Role, 
+        on_delete=models.CASCADE, 
+        related_name='role_mappings' 
+    )
+    permission = models.ForeignKey(
+        Permission, 
+        on_delete=models.CASCADE,
+        related_name='permission_mappings'
+    )
 
     class Meta:
         unique_together = ('role', 'permission')
