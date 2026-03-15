@@ -3,7 +3,7 @@ from django.contrib.contenttypes.models import ContentType
 from rest_framework.exceptions import ValidationError
 from .models import FinancialTransaction, Expense, Sale, RecurringExpense, RecurringExpenseType
 from ..inventory.models import Inventory, InventoryTransaction
-from ..inventory.utils import adjust_inventory_stock
+from ..inventory.utils import adjust_inventory_stock, adjust_inventory_stock_v2
 from ..logs.utils.helper import Logger
 from ..animals.models import Animal
 
@@ -207,4 +207,98 @@ def process_financial_flow(user, tx_type, amount, category, item_name, ref_model
             Animal.objects.filter(id=item_id).update(status='sold', is_active=False)
 
     Logger.write(user, f"Finance: {tx_type}", f"Processed {category} (Standalone: {is_standalone})", "Finance")
+    return True
+
+@transaction.atomic
+def process_unified_transaction(user, tx_type, amount, category, item_name, ref_model, data):
+    """
+    Handles Unified Logic for FinancialTransaction ViewSet.
+    """
+    ref_model = ref_model.lower()
+    ctype = ContentType.objects.get(model=ref_model)
+    item_id = data.get('item_id', 0)
+    qty = data.get('qty', 0)
+    unit = data.get('unit', 'Units')
+    is_standalone = data.get('is_standalone', False)
+    is_recurring = data.get('is_recurring', False)
+    recurring_type_id = data.get('recurring_type')
+    is_paid = data.get('is_paid', True)
+    notes = data.get('notes', '')
+
+    reference_obj = None
+
+    # --- 1. EXPENSE FLOW ---
+    if tx_type == 'EXPENSE':
+        reference_obj = Expense.objects.create(
+            content_type=ctype,
+            object_id=item_id,
+            category_name=category,
+            amount=amount,
+            is_paid=is_paid,
+            description=f"Expense for {item_name}"
+        )
+
+        if is_recurring and recurring_type_id:
+            r_type = RecurringExpenseType.objects.get(id=recurring_type_id)
+            RecurringExpense.objects.get_or_create(
+                expense_type=r_type, name=category, user=user,
+                defaults={'amount': amount}
+            )
+
+        if not is_standalone:
+            # Update Inventory
+            InventoryTransaction.objects.create(
+                content_type=ctype, object_id=item_id, transaction_type='PURCHASE',
+                quantity=qty, unit=unit, description=f"Bought {item_name}"
+            )
+            adjust_inventory_stock_v2(user, ref_model, item_id, category, item_name, qty, unit, "add")
+
+    # --- 2. INCOME (SALE) FLOW ---
+    elif tx_type == 'INCOME':
+        # Scalable check for any model (Animal, Resource, Product)
+        target_inv_id = item_id if ref_model == 'animal' else 0
+        
+        inv_item = Inventory.objects.filter(
+            content_type=ctype, 
+            object_id=target_inv_id,
+            category_name=category
+        ).first()
+
+        if not inv_item:
+            raise ValidationError(f"Item '{category}' not found in inventory.")
+        if inv_item.quantity < qty:
+            raise ValidationError(f"Insufficient stock. Have: {inv_item.quantity}, Need: {qty}")
+
+        reference_obj = Sale.objects.create(
+            content_type=ctype,
+            object_id=item_id,
+            category_name=category,
+            quantity=qty,
+            price_per_item=amount / qty if qty > 0 else amount,
+            is_paid=is_paid,
+            notes=notes
+        )
+
+        # Inventory Movement
+        InventoryTransaction.objects.create(
+            content_type=ctype, object_id=item_id, transaction_type='SALE',
+            quantity=qty, unit=unit, description=f"Sold {item_name}"
+        )
+        
+        # Deduct Stock
+        adjust_inventory_stock_v2(user, ref_model, item_id, category, item_name, qty, unit, "remove")
+
+        # Animal Specific Logic
+        if ref_model == 'animal':
+            Animal.objects.filter(id=item_id).update(status='sold', is_active=False)
+
+    # --- 3. LEDGER & LOG ---
+    FinancialTransaction.objects.create(
+        type=tx_type, amount=amount, category=category, item_name=item_name,
+        reference_type=ContentType.objects.get_for_model(reference_obj),
+        reference_id=reference_obj.id, payment_method=data.get('payment_method', 'Cash'),
+        notes=notes
+    )
+
+    Logger.write(user, f"Finance: {tx_type}", f"Processed {category}", "Finance")
     return True

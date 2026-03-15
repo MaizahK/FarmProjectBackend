@@ -23,17 +23,13 @@ class FinancialTransaction(models.Model):
         return f"{self.type}: {self.amount} ({self.category})"
 
 class Sale(models.Model):
-    # Link to the item being sold
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
     object_id = models.PositiveIntegerField()
     item = GenericForeignKey('content_type', 'object_id')
 
-    # --- Fields Added to Match Expense Model ---
-    category_name = models.CharField(max_length=100, help_text="e.g., Poultry Sales")
+    category_name = models.CharField(max_length=100)
     is_paid = models.BooleanField(default=False)
     description = models.CharField(max_length=255, blank=True)
-    # -------------------------------------------
-
     quantity = models.DecimalField(max_digits=10, decimal_places=2)
     price_per_item = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
     total_amount = models.DecimalField(max_digits=12, decimal_places=2)
