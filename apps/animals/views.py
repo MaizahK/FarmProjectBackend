@@ -24,6 +24,13 @@ class AnimalViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         instance = serializer.save(owner=self.request.user)
+        
+        Logger.write(
+            user=self.request.user,
+            title="Animal Created",
+            description=f"Added animal: {instance.tag_id}",
+            module="Animals"
+        )
         if self.request.data.get('add_to_inventory'):
             process_inventory_purchase(
                 user=self.request.user,
