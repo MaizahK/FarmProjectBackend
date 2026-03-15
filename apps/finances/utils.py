@@ -60,6 +60,42 @@ def process_inventory_purchase(user, model_name, object_id, qty, amount, categor
         return False
 
 @transaction.atomic
+def process_inventory_production(user, model_name, object_id, qty, category, item_name, unit="Units"):
+    """
+    Handles internal production/harvesting (e.g., Milk collection).
+    Records an Inventory Transaction and updates the Stock Balance.
+    """
+    try:
+        model_name = model_name.lower()
+        ctype = ContentType.objects.get(model=model_name)
+
+        # 1. Record Inventory Transaction (The Movement Log)
+        InventoryTransaction.objects.create(
+            content_type=ctype,
+            object_id=object_id,
+            transaction_type='PRODUCTION', # Or 'HARVEST' depending on your choices
+            quantity=qty,
+            description=f"Produced/Collected {qty} {unit} of {item_name}",
+        )
+
+        # 2. Adjust Inventory Stock (The Current Balance)
+        success = adjust_inventory_stock(
+            user=user,
+            model_name=model_name,
+            object_id=object_id,
+            category=category,
+            item_name=item_name,
+            quantity=qty,
+            unit=unit,
+            action="add"
+        )
+        
+        return success
+    except Exception as e:
+        print(f"Production Flow Error: {e}")
+        return False
+
+@transaction.atomic
 def process_full_sale(user, sale_instance):
     # 1. Financial Ledger (Income)
     FinancialTransaction.objects.create(

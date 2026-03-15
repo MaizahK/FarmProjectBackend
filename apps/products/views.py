@@ -1,6 +1,6 @@
 from django.shortcuts import render
 from ..logs.utils.helper import Logger
-from ..inventory.utils import adjust_inventory_stock
+from ..finances.utils import process_inventory_production
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
 from .models import Product, ProductType
@@ -42,51 +42,45 @@ class ProductTypeViewSet(viewsets.ModelViewSet):
 
 
 class ProductViewSet(viewsets.ModelViewSet):
-    queryset = Product.objects.all()
+    queryset = Product.objects.filter(is_deleted=False)
     serializer_class = ProductSerializer
     permission_classes = [IsAuthenticated]
     
     def get_queryset(self):
-        """
-        Optional: Filter Products by type via URL query params
-        Example: /api/Products/?type=Vaccine
-        """
-        queryset = Product.objects.all()
+        queryset = Product.objects.filter(is_deleted=False)
         rt_name = self.request.query_params.get('type')
         if rt_name:
-            # Fixed: changed Product_type to product_type to match model field
             queryset = queryset.filter(product_type__name__iexact=rt_name)
         return queryset
 
     def perform_create(self, serializer):
+        # 1. Save the model instance
         instance = serializer.save()
-        animal_info = f" for Animal: {instance.animal.tag_id}" if instance.animal else ""
+        
+        # 2. Basic Activity Log
+        animal_info = f" from Animal: {instance.animal.tag_id}" if instance.animal else ""
         Logger.write(
             user=self.request.user,
-            title="Product Created",
-            description=f"Added {instance.product_type.name}: {instance.description}{animal_info}",
+            title="Product Recorded",
+            description=f"Recorded {instance.product_type.name}: {instance.description}{animal_info}",
             module="Products"
         )
 
+        # 3. Handle Production Inventory Flow
         if getattr(serializer, '_add_to_inventory', False):
-            try:
-                qty = float(instance.quantity)
-            except (TypeError, ValueError):
-                qty = 0
-
-            adjust_inventory_stock(
+            # This handles both the Transaction Log and the Stock Balance
+            process_inventory_production(
                 user=self.request.user,
                 model_name="product",
                 object_id=instance.id,
+                qty=instance.quantity,
                 category=instance.product_type.name,
                 item_name=instance.description,
-                quantity=qty,
-                unit=instance.unit,
-                action="add",
+                unit=instance.unit
             )
-
     def perform_update(self, serializer):
         instance = serializer.save()
+        
         Logger.write(
             user=self.request.user,
             title="Product Updated",
@@ -94,46 +88,50 @@ class ProductViewSet(viewsets.ModelViewSet):
             module="Products"
         )
 
-        if getattr(serializer, '_add_to_inventory', False):
-            try:
-                qty = float(instance.quantity)
-            except (TypeError, ValueError):
-                qty = 0
+        # if getattr(serializer, '_add_to_inventory', False):
+        #     try:
+        #         qty = float(instance.quantity)
+        #     except (TypeError, ValueError):
+        #         qty = 0
 
-            adjust_inventory_stock(
-                user=self.request.user,
-                model_name="product",
-                object_id=instance.id,
-                category=instance.product_type.name,
-                item_name=instance.description,
-                quantity=qty,
-                unit="Units",
-                action="add",
-            )
+        #     # Usually used for stock corrections during update
+        #     adjust_inventory_stock(
+        #         user=self.request.user,
+        #         model_name="product",
+        #         object_id=instance.id,
+        #         category=instance.product_type.name,
+        #         item_name=instance.description,
+        #         quantity=qty,
+        #         unit=instance.unit,
+        #         action="add",
+        #     )
 
     def perform_destroy(self, instance):
         desc = instance.description
         instance.is_deleted = True
-        instance.is_active = False 
+        # Assuming your model has 'is_active', otherwise omit this line
+        if hasattr(instance, 'is_active'):
+            instance.is_active = False 
         instance.save()
 
-        add_inv = self.request.query_params.get("add_to_inventory")
-        if str(add_inv).lower() in ("1", "true", "yes", "on"):
-            try:
-                qty = float(instance.quantity)
-            except (TypeError, ValueError):
-                qty = 0
+        # Optional: Remove from inventory on delete if query param is passed
+        # remove_inv = self.request.query_params.get("remove_from_inventory")
+        # if str(remove_inv).lower() in ("1", "true", "yes"):
+        #     try:
+        #         qty = float(instance.quantity)
+        #     except (TypeError, ValueError):
+        #         qty = 0
 
-            adjust_inventory_stock(
-                user=self.request.user,
-                model_name="product",
-                object_id=instance.id,
-                category=instance.product_type.name,
-                item_name=instance.description,
-                quantity=qty,
-                unit="Units",
-                action="remove",
-            )
+        #     adjust_inventory_stock(
+        #         user=self.request.user,
+        #         model_name="product",
+        #         object_id=instance.id,
+        #         category=instance.product_type.name,
+        #         item_name=instance.description,
+        #         quantity=qty,
+        #         unit=instance.unit,
+        #         action="remove",
+        #     )
 
         Logger.write(
             user=self.request.user,
