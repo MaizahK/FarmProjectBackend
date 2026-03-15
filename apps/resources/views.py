@@ -1,4 +1,5 @@
 from ..logs.utils.helper import Logger
+from ..finances.utils import process_inventory_purchase
 from ..inventory.utils import adjust_inventory_stock
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
@@ -41,45 +42,38 @@ class ResourceTypeViewSet(viewsets.ModelViewSet):
 
 
 class ResourceViewSet(viewsets.ModelViewSet):
-    queryset = Resource.objects.all()
+    queryset = Resource.objects.filter(is_deleted=False)
     serializer_class = ResourceSerializer
     permission_classes = [IsAuthenticated]
-    
-    def get_queryset(self):
-        """
-        Optional: Filter resources by type via URL query params
-        Example: /api/resources/?type=Vaccine
-        """
-        queryset = Resource.objects.all()
-        rt_name = self.request.query_params.get('type')
-        if rt_name:
-            queryset = queryset.filter(resource_type__name__iexact=rt_name)
-        return queryset
 
     def perform_create(self, serializer):
+        # 1. Save the Resource instance
         instance = serializer.save()
+        
+        # Extract transient data from serializer
+        amount = getattr(serializer, '_amount', 0)
+        add_to_inv = getattr(serializer, '_add_to_inventory', False)
+
+        # 2. Standard Activity Log
         Logger.write(
             user=self.request.user,
             title="Resource Created",
-            description=f"Added resource: {instance.name} ({instance.resource_type.name})",
+            description=f"Added resource: {instance.name}",
             module="Resources"
         )
 
-        if getattr(serializer, '_add_to_inventory', False):
-            try:
-                qty = float(instance.quantity)
-            except (TypeError, ValueError):
-                qty = 0
-
-            adjust_inventory_stock(
+        # 3. Trigger the Unified Purchase Flow
+        # This handles: Expense, Financial Transaction, Inventory Log, and Stock Adjustment
+        if add_to_inv:
+            process_inventory_purchase(
                 user=self.request.user,
                 model_name="resource",
                 object_id=instance.id,
+                qty=instance.quantity,
+                amount=amount,
                 category=instance.resource_type.name,
                 item_name=instance.name,
-                quantity=qty,
-                unit=instance.unit,
-                action="add",
+                unit=instance.unit
             )
 
     def perform_update(self, serializer):
@@ -87,54 +81,33 @@ class ResourceViewSet(viewsets.ModelViewSet):
         Logger.write(
             user=self.request.user,
             title="Resource Updated",
-            description=f"Updated resource: {instance.name}",
+            description=f"Updated details for {instance.name}",
             module="Resources"
         )
 
-        if getattr(serializer, '_add_to_inventory', False):
-            try:
-                qty = float(instance.quantity)
-            except (TypeError, ValueError):
-                qty = 0
-
-            adjust_inventory_stock(
-                user=self.request.user,
-                model_name="resource",
-                object_id=instance.id,
-                category=instance.resource_type.name,
-                item_name=instance.name,
-                quantity=qty,
-                unit="Units",
-                action="add",
-            )
-
     def perform_destroy(self, instance):
-        name = instance.name
+        # Soft Delete Logic
         instance.is_deleted = True
-        instance.is_active = False
         instance.save()
 
-        add_inv = self.request.query_params.get("add_to_inventory")
-        if str(add_inv).lower() in ("1", "true", "yes", "on"):
-            try:
-                qty = float(instance.quantity)
-            except (TypeError, ValueError):
-                qty = 0
-
+        # Check if we should also remove this from active inventory stock
+        # Triggered via query param: DELETE /api/resources/1/?remove_from_inventory=true
+        remove_inv = self.request.query_params.get("remove_from_inventory")
+        if str(remove_inv).lower() in ("1", "true", "yes"):
             adjust_inventory_stock(
                 user=self.request.user,
                 model_name="resource",
                 object_id=instance.id,
                 category=instance.resource_type.name,
                 item_name=instance.name,
-                quantity=qty,
-                unit="Units",
-                action="remove",
+                quantity=instance.quantity,
+                unit=instance.unit,
+                action="remove"
             )
 
         Logger.write(
             user=self.request.user,
             title="Resource Deleted",
-            description=f"Removed resource: {name}",
+            description=f"Soft deleted resource: {instance.name}",
             module="Resources"
         )

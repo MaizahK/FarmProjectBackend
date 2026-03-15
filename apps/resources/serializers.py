@@ -7,21 +7,25 @@ class ResourceTypeSerializer(serializers.ModelSerializer):
         fields = ['id', 'name', 'description']
 
 class ResourceSerializer(serializers.ModelSerializer):
-    # This makes the API response more readable
     resource_type_name = serializers.ReadOnlyField(source='resource_type.name')
+    # Transient fields for logic processing
     add_to_inventory = serializers.BooleanField(write_only=True, required=False, default=False)
+    amount = serializers.DecimalField(max_digits=12, decimal_places=2, write_only=True, required=False)
 
     class Meta:
         model = Resource
-        fields = ['id', 'resource_type', 'resource_type_name', 'name', 'vendor', 'quantity', 'unit', 'add_to_inventory', 'is_deleted']
-
+        fields = [
+            'id', 'resource_type', 'resource_type_name', 'name', 
+            'vendor', 'quantity', 'unit', 'add_to_inventory', 
+            'amount', 'is_deleted'
+        ]
 
     def create(self, validated_data):
-        # Ensure transient `add_to_inventory` is not passed into the model create()
         self._add_to_inventory = validated_data.pop('add_to_inventory', False)
+        self._amount = validated_data.pop('amount', 0)
         return super().create(validated_data)
 
     def update(self, instance, validated_data):
-        # Ensure transient `add_to_inventory` is not passed into the model update()
         self._add_to_inventory = validated_data.pop('add_to_inventory', False)
+        self._amount = validated_data.pop('amount', 0)
         return super().update(instance, validated_data)
