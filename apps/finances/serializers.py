@@ -3,24 +3,60 @@ from django.contrib.contenttypes.models import ContentType
 from .models import Sale, Expense, RecurringExpenseType, RecurringExpense, FinancialTransaction
 
 class FinancialTransactionSerializer(serializers.ModelSerializer):
+    ref_model = serializers.CharField(write_only=True)
+    item_id = serializers.IntegerField(write_only=True, required=False, default=0)
+    qty = serializers.DecimalField(max_digits=10, decimal_places=2, write_only=True, required=False, default=0)
+    unit = serializers.CharField(write_only=True, required=False, default="Units")
+    
+    # Transient Fields for logic processing
+    is_recurring = serializers.BooleanField(write_only=True, default=False)
+    recurring_type = serializers.IntegerField(write_only=True, required=False, allow_null=True)
+    is_standalone = serializers.BooleanField(write_only=True, default=False)
+
     class Meta:
         model = FinancialTransaction
-        fields = '__all__'
-
-class SaleSerializer(serializers.ModelSerializer):
-    content_type = serializers.SlugRelatedField(slug_field='model', queryset=ContentType.objects.all())
-    
-    class Meta:
-        model = Sale
-        fields = ['id', 'content_type', 'object_id', 'quantity', 'price_per_item', 'total_amount', 'sale_date', 'notes']
-        read_only_fields = ['total_amount']
+        fields = [
+            'id', 'type', 'amount', 'category', 'item_name', 'ref_model', 'item_id', 
+            'qty', 'unit', 'payment_method', 'notes', 'created_at',
+            'is_recurring', 'recurring_type', 'is_standalone'
+        ]
 
 class ExpenseSerializer(serializers.ModelSerializer):
-    content_type = serializers.SlugRelatedField(slug_field='model', queryset=ContentType.objects.all(), allow_null=True, required=False)
+    # Transient fields for recurring logic
+    is_recurring = serializers.BooleanField(write_only=True, default=False)
+    recurring_type = serializers.IntegerField(write_only=True, required=False, allow_null=True)
+    content_type = serializers.SlugRelatedField(
+        slug_field='model', 
+        queryset=ContentType.objects.all(), 
+        required=False, 
+        allow_null=True
+    )
 
     class Meta:
         model = Expense
-        fields = ['id', 'content_type', 'object_id', 'category_name', 'amount', 'is_paid', 'expense_date', 'description']
+        fields = [
+            'id', 'content_type', 'object_id', 'category_name', 'amount', 
+            'is_paid', 'expense_date', 'description', 'is_recurring', 'recurring_type'
+        ]
+
+class SaleSerializer(serializers.ModelSerializer):
+    # Transient fields to match Expense behavior
+    is_recurring = serializers.BooleanField(write_only=True, default=False)
+    recurring_type = serializers.IntegerField(write_only=True, required=False, allow_null=True)
+    
+    content_type = serializers.SlugRelatedField(
+        slug_field='model', 
+        queryset=ContentType.objects.all()
+    )
+    
+    class Meta:
+        model = Sale
+        fields = [
+            'id', 'content_type', 'object_id', 'category_name', 'quantity', 
+            'price_per_item', 'total_amount', 'is_paid', 'description', 
+            'sale_date', 'notes', 'is_recurring', 'recurring_type'
+        ]
+        read_only_fields = ['total_amount']
 
 class RecurringExpenseTypeSerializer(serializers.ModelSerializer):
     class Meta:

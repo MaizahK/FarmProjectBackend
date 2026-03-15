@@ -8,14 +8,14 @@ class FinancialTransaction(models.Model):
     
     type = models.CharField(max_length=10, choices=TRANSACTION_TYPES)
     amount = models.DecimalField(max_digits=12, decimal_places=2)
-    category = models.CharField(max_length=100) # e.g., "Livestock Sale", "Feed Purchase"
+    category = models.CharField(max_length=100)
+    item_name = models.CharField(max_length=100)
     
-    # Link to whatever caused this (Sale, Expense, etc.)
     reference_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
     reference_id = models.PositiveIntegerField()
     reference_object = GenericForeignKey('reference_type', 'reference_id')
     
-    payment_method = models.CharField(max_length=50, blank=True) # e.g., "Cash", "Bank"
+    payment_method = models.CharField(max_length=50, blank=True)
     notes = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -23,10 +23,16 @@ class FinancialTransaction(models.Model):
         return f"{self.type}: {self.amount} ({self.category})"
 
 class Sale(models.Model):
-    # The actual item being sold (Product like Milk or Animal)
+    # Link to the item being sold
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
     object_id = models.PositiveIntegerField()
     item = GenericForeignKey('content_type', 'object_id')
+
+    # --- Fields Added to Match Expense Model ---
+    category_name = models.CharField(max_length=100, help_text="e.g., Poultry Sales")
+    is_paid = models.BooleanField(default=False)
+    description = models.CharField(max_length=255, blank=True)
+    # -------------------------------------------
 
     quantity = models.DecimalField(max_digits=10, decimal_places=2)
     price_per_item = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)

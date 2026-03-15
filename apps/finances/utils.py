@@ -1,10 +1,11 @@
 from django.db import transaction
 from django.contrib.contenttypes.models import ContentType
-from .models import FinancialTransaction, Expense, Sale
-from ..inventory.models import InventoryTransaction
+from rest_framework.exceptions import ValidationError
+from .models import FinancialTransaction, Expense, Sale, RecurringExpense, RecurringExpenseType
+from ..inventory.models import Inventory, InventoryTransaction
 from ..inventory.utils import adjust_inventory_stock
 from ..logs.utils.helper import Logger
-from ..animals.models import Animal # Assuming this path
+from ..animals.models import Animal
 
 @transaction.atomic
 def process_inventory_purchase(user, model_name, object_id, qty, amount, category, item_name, unit="Units"):
@@ -98,47 +99,112 @@ def process_inventory_production(user, model_name, object_id, qty, category, ite
         return False
 
 @transaction.atomic
-def process_full_sale(user, sale_instance):
-    # 1. Financial Ledger (Income)
+def process_financial_flow(user, tx_type, amount, category, item_name, ref_model, ref_data, is_standalone=False, is_recurring=False, recurring_type_id=None):
+    """
+    Main entry point for Financial Transactions.
+    Bridges Finance, Inventory, and Recurring templates.
+    """
+    ctype = ContentType.objects.get(model=ref_model)
+    item_id = ref_data.get('object_id', 0)
+    qty = ref_data.get('quantity', 0)
+    unit = ref_data.get('unit', 'Units')
+    description = ref_data.get('description', f"{tx_type} for {category}")
+
+    # --- 1. INCOME (SALE) LOGIC ---
+    if tx_type == 'INCOME':
+        if not is_standalone:
+            # Inventory Validation: Must exist and have enough stock
+            # Products usually use object_id 0 in hybrid inventory systems
+            target_inv_id = item_id if ref_model == 'animal' else 0
+            
+            inv_item = Inventory.objects.filter(
+                content_type=ctype, 
+                object_id=target_inv_id,
+                category_name=category
+            ).first()
+
+            if not inv_item:
+                raise ValidationError(f"Item '{category}' not found in inventory.")
+            
+            if inv_item.quantity < qty:
+                raise ValidationError(f"Insufficient stock. Available: {inv_item.quantity}, Requested: {qty}")
+
+        # Create Sale Record with new fields
+        reference_obj = Sale.objects.create(
+            content_type=ctype,
+            object_id=item_id,
+            category_name=category,
+            quantity=qty,
+            price_per_item=amount / qty if qty > 0 else amount,
+            is_paid=ref_data.get('is_paid', True),
+            description=description,
+            notes=ref_data.get('notes', '')
+        )
+
+    # --- 2. EXPENSE LOGIC ---
+    else: 
+        reference_obj = Expense.objects.create(
+            content_type=ctype,
+            object_id=item_id,
+            category_name=category,
+            amount=amount,
+            is_paid=ref_data.get('is_paid', True),
+            description=description
+        )
+
+        # RECURRING LOGIC (Only for Expenses in this context)
+        if is_recurring and recurring_type_id:
+            try:
+                r_type = RecurringExpenseType.objects.get(id=recurring_type_id)
+                RecurringExpense.objects.get_or_create(
+                    expense_type=r_type,
+                    name=category,
+                    user=user,
+                    defaults={'amount': amount}
+                )
+            except RecurringExpenseType.DoesNotExist:
+                pass
+
+    # --- 3. FINANCIAL LEDGER ---
     FinancialTransaction.objects.create(
-        type='INCOME',
-        amount=sale_instance.total_amount,
-        category="Sales",
-        reference_type=ContentType.objects.get_for_model(sale_instance),
-        reference_id=sale_instance.id
-    )
-
-    # 2. Inventory Transaction Log
-    InventoryTransaction.objects.create(
-        content_type=sale_instance.content_type,
-        object_id=sale_instance.object_id,
-        transaction_type='SALE',
-        quantity=sale_instance.quantity,
-        description=f"Sold {sale_instance.item}"
-    )
-
-    # 3. Hybrid Reduction
-    model_name = sale_instance.content_type.model
-    
-    # Determine item details for logic
-    if model_name == 'animal':
-        category = getattr(sale_instance.item, 'species', 'Livestock')
-        item_name = getattr(sale_instance.item, 'tag_id', 'Unknown')
-        # Mark animal as sold in the actual Animal model
-        Animal.objects.filter(id=sale_instance.object_id).update(status='sold', is_active=False)
-    else:
-        category = getattr(sale_instance.item, 'category', 'General')
-        item_name = getattr(sale_instance.item, 'name', 'Product')
-
-    adjust_inventory_stock(
-        user=user,
-        model_name=model_name,
-        object_id=sale_instance.object_id,
+        type=tx_type,
+        amount=amount,
         category=category,
-        item_name=item_name,
-        quantity=sale_instance.quantity,
-        unit="Units",
-        action="remove"
+        reference_type=ContentType.objects.get_for_model(reference_obj),
+        reference_id=reference_obj.id,
+        payment_method=ref_data.get('payment_method', 'Cash'),
+        notes=ref_data.get('notes', '')
     )
-    
-    Logger.write(user, "Sale Completed", f"Processed sale for {item_name}", "Finance")
+
+    # --- 4. INVENTORY IMPACT ---
+    if not is_standalone:
+        action = "remove" if tx_type == 'INCOME' else "add"
+        
+        # Log Movement
+        InventoryTransaction.objects.create(
+            content_type=ctype,
+            object_id=item_id,
+            transaction_type='SALE' if tx_type == 'INCOME' else 'PURCHASE',
+            quantity=qty,
+            unit=unit,
+            description=description
+        )
+
+        # Adjust Balance (Utility handles decrement/deletion or increment)
+        adjust_inventory_stock(
+            user=user,
+            model_name=ref_model,
+            object_id=item_id,
+            category=category,
+            item_name=item_name, # Using category as item name
+            quantity=qty,
+            unit=unit,
+            action=action
+        )
+
+        # Special Animal Handling: If animal is sold, mark as inactive
+        if tx_type == 'INCOME' and ref_model == 'animal':
+            Animal.objects.filter(id=item_id).update(status='sold', is_active=False)
+
+    Logger.write(user, f"Finance: {tx_type}", f"Processed {category} (Standalone: {is_standalone})", "Finance")
+    return True
