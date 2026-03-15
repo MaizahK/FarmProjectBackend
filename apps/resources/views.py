@@ -92,18 +92,18 @@ class ResourceViewSet(viewsets.ModelViewSet):
 
         # Check if we should also remove this from active inventory stock
         # Triggered via query param: DELETE /api/resources/1/?remove_from_inventory=true
-        remove_inv = self.request.query_params.get("remove_from_inventory")
-        if str(remove_inv).lower() in ("1", "true", "yes"):
-            adjust_inventory_stock(
-                user=self.request.user,
-                model_name="resource",
-                object_id=instance.id,
-                category=instance.resource_type.name,
-                item_name=instance.name,
-                quantity=instance.quantity,
-                unit=instance.unit,
-                action="remove"
-            )
+        # remove_inv = self.request.query_params.get("remove_from_inventory")
+        # if str(remove_inv).lower() in ("1", "true", "yes"):
+        #     adjust_inventory_stock(
+        #         user=self.request.user,
+        #         model_name="resource",
+        #         object_id=instance.id,
+        #         category=instance.resource_type.name,
+        #         item_name=instance.name,
+        #         quantity=instance.quantity,
+        #         unit=instance.unit,
+        #         action="remove"
+        #     )
 
         Logger.write(
             user=self.request.user,
