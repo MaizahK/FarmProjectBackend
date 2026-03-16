@@ -7,7 +7,7 @@ from .serializers import InventorySerializer, InventoryTransactionSerializer
 from .utils import adjust_inventory_stock
 from django.db import transaction as db_transaction
 
-class InventoryViewSet(viewsets.ReadOnlyModelViewSet):
+class InventoryViewSet(viewsets.ModelViewSet):
     queryset = Inventory.objects.all()
     serializer_class = InventorySerializer
     permission_classes = [IsAuthenticated]

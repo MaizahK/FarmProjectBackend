@@ -3,6 +3,10 @@ from django.contrib.contenttypes.models import ContentType
 from .models import Inventory, InventoryTransaction
 
 class InventorySerializer(serializers.ModelSerializer):
+    content_type = serializers.SlugRelatedField(
+        slug_field='model',
+        queryset=ContentType.objects.all()
+    )
     class Meta:
         model = Inventory
         fields = '__all__'
