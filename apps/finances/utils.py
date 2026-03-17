@@ -159,7 +159,6 @@ def process_financial_flow(user, tx_type, amount, category, item_name, ref_model
                 RecurringExpense.objects.get_or_create(
                     expense_type=r_type,
                     name=category,
-                    user=user,
                     defaults={'amount': amount}
                 )
             except RecurringExpenseType.DoesNotExist:
@@ -241,7 +240,7 @@ def process_unified_transaction(user, tx_type, amount, category, item_name, ref_
         if is_recurring and recurring_type_id:
             r_type = RecurringExpenseType.objects.get(id=recurring_type_id)
             RecurringExpense.objects.get_or_create(
-                expense_type=r_type, name=category, user=user,
+                expense_type=r_type, name=category,
                 defaults={'amount': amount}
             )
 
@@ -302,3 +301,47 @@ def process_unified_transaction(user, tx_type, amount, category, item_name, ref_
 
     Logger.write(user, f"Finance: {tx_type}", f"Processed {category}", "Finance")
     return True
+
+@transaction.atomic
+def process_employee_salary_recurring(user, employee_id, amount, employee_name, is_recurring):
+    """
+    Handles the creation of salary as an Expense, Ledger Entry, 
+    and optional Recurring Expense Template.
+    """
+    try:
+        # 1. Create the Expense (Standalone)
+        # Using 'user' as the ref_model for employees if they are linked to Auth User
+        expense = Expense.objects.create(
+            category_name="Salary",
+            amount=amount,
+            is_paid=True,
+            description=f"Initial salary record for {employee_name}"
+        )
+
+        # 2. Financial Ledger Entry
+        FinancialTransaction.objects.create(
+            type='EXPENSE',
+            amount=amount,
+            category="Salary",
+            reference_type=ContentType.objects.get_for_model(expense),
+            reference_id=expense.id,
+            notes=f"Auto-generated salary for employee ID: {employee_id}"
+        )
+
+        # 3. Recurring Expense Template
+        if is_recurring:
+            r_type, _ = RecurringExpenseType.objects.get_or_create(id=3, defaults={'name': 'Salaries'})
+            RecurringExpense.objects.update_or_create(
+                user_id=employee_id, # Linking user_id to employee_id as requested
+                expense_type=r_type,
+                defaults={
+                    'name': f"Salary - {employee_name}",
+                    'amount': amount
+                }
+            )
+        
+        Logger.write(user, "Finance: Salary", f"Processed salary for {employee_name}", "Finance")
+        return True
+    except Exception as e:
+        print(f"Salary Flow Error: {e}")
+        return False
