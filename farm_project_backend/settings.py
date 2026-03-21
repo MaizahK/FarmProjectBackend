@@ -17,22 +17,24 @@ pymysql.install_as_MySQLdb()
 
 from pathlib import Path
 import os
+from dotenv import load_dotenv
+import json
 
+load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
-
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-^p!_oxq%@=_t%73ck*9xv6kf$)@m+sl83x5_r*_&_iyv=otj#1'
+SECRET_KEY = os.getenv('ENV_DJANGO_SECRET_KEY', '')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.getenv('ENV_DEBUG', False)
 
-ALLOWED_HOSTS = ["https://8nnv9qmp-8000.inc1.devtunnels.ms/","192.168.1.111", "0.0.0.0", "*"]
+ALLOWED_HOSTS = os.getenv('ENV_ALLOWED_HOSTS').split(',')
 APPEND_SLASH=False
 
 MEDIA_URL = '/assets/'
@@ -131,8 +133,15 @@ AUTH_USER_MODEL = 'users.User'
 # 2. Default Database (SQLite)
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.mysql',
+        'NAME': os.getenv('ENV_DB_NAME'),
+        'USER': os.getenv('ENV_DB_USER'),
+        'PASSWORD': os.getenv('ENV_DB_PASSWORD'),
+        'HOST': os.getenv('HOST'),
+        'PORT': os.getenv('PORT'),
+        'OPTIONS': {
+            'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
+        },
     }
 }
 
