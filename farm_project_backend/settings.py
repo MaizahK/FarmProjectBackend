@@ -32,7 +32,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.getenv('ENV_DJANGO_SECRET_KEY', '')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv('ENV_DEBUG', False)
+DEBUG = bool(int(os.getenv('ENV_DEBUG', 0)))
 
 ALLOWED_HOSTS = os.getenv('ENV_ALLOWED_HOSTS').split(',')
 APPEND_SLASH=False
@@ -137,8 +137,8 @@ DATABASES = {
         'NAME': os.getenv('ENV_DB_NAME'),
         'USER': os.getenv('ENV_DB_USER'),
         'PASSWORD': os.getenv('ENV_DB_PASSWORD'),
-        'HOST': os.getenv('HOST'),
-        'PORT': os.getenv('PORT'),
+        'HOST': os.getenv('ENV_DB_HOST'),
+        'PORT': os.getenv('ENV_DB_PORT'),
         'OPTIONS': {
             'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
         },
