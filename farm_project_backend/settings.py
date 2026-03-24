@@ -37,8 +37,8 @@ DEBUG = bool(int(os.getenv('ENV_DEBUG', 1)))
 ALLOWED_HOSTS = os.getenv('ENV_ALLOWED_HOSTS').split(',')
 APPEND_SLASH=False
 
-MEDIA_URL = '/assets/'
-MEDIA_ROOT = os.path.join(BASE_DIR, 'assets')
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 # Application definition
 
