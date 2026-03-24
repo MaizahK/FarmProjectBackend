@@ -26,6 +26,7 @@ venv.bak/
 /static_root/
 /staticfiles/
 /assets/
+/media/
 
 # --- IDEs / Editors ---
 .visualstudio
