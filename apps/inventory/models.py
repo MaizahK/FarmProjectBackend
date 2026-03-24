@@ -18,6 +18,9 @@ class Inventory(models.Model):
     )
     last_updated = models.DateTimeField(auto_now=True)
 
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
     class Meta:
         # This allows animals to be unique by ID, 
         # while collective items stay unique by name + object_id (0)

@@ -4,6 +4,9 @@ class ResourceType(models.Model):
     name = models.CharField(max_length=100, unique=True) # e.g., "Vaccine", "Feed"
     description = models.TextField(blank=True)
 
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
     def __str__(self):
         return self.name
 
@@ -18,6 +21,9 @@ class Resource(models.Model):
     vendor = models.CharField(max_length=200, blank=True)
     is_deleted = models.BooleanField(default=False)
     
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
     def __str__(self):
         return f"{self.name} ({self.resource_type.name})"
 

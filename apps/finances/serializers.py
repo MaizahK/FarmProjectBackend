@@ -17,7 +17,7 @@ class FinancialTransactionSerializer(serializers.ModelSerializer):
         model = FinancialTransaction
         fields = [
             'id', 'type', 'amount', 'category', 'item_name', 'ref_model', 'item_id', 
-            'qty', 'unit', 'payment_method', 'notes', 'created_at',
+            'qty', 'unit', 'payment_method', 'notes', 'created_at', 'updated_at',
             'is_recurring', 'recurring_type', 'is_standalone', 'is_paid'
         ]
 

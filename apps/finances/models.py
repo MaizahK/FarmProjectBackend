@@ -17,7 +17,9 @@ class FinancialTransaction(models.Model):
     
     payment_method = models.CharField(max_length=50, blank=True)
     notes = models.TextField(blank=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return f"{self.type}: {self.amount} ({self.category})"
@@ -36,6 +38,9 @@ class Sale(models.Model):
     sale_date = models.DateTimeField(auto_now_add=True)
     notes = models.TextField(blank=True)
 
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
     def save(self, *args, **kwargs):
         self.total_amount = self.quantity * self.price_per_item
         super().save(*args, **kwargs)
@@ -51,11 +56,20 @@ class Expense(models.Model):
     expense_date = models.DateTimeField(auto_now_add=True)
     description = models.CharField(max_length=255)
 
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
 class RecurringExpenseType(models.Model):
     name = models.CharField(max_length=100)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
 class RecurringExpense(models.Model):
     expense_type = models.ForeignKey(RecurringExpenseType, on_delete=models.CASCADE)
     name = models.CharField(max_length=255)
     amount = models.DecimalField(max_digits=12, decimal_places=2)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)

@@ -5,7 +5,7 @@ from .models import Animal, AnimalPurpose, AnimalHistory
 class AnimalPurposeSerializer(serializers.ModelSerializer):
     class Meta:
         model = AnimalPurpose
-        fields = ['id', 'name', 'species']
+        fields = ['id', 'name', 'species',  'created_at', 'updated_at']
 
 class AnimalHistorySerializer(serializers.ModelSerializer):
     animal_tag = serializers.ReadOnlyField(source='animal.tag_id')
@@ -13,7 +13,7 @@ class AnimalHistorySerializer(serializers.ModelSerializer):
     class Meta:
         model = AnimalHistory
         fields = [
-            'id', 'animal', 'animal_tag', 'event_name', 'record_type', 
+            'id', 'animal', 'animal_tag', 'event_name', 'record_type',  'created_at', 'updated_at',
             'description', 'event_date', 'performed_by', 'next_due_date'
         ]
 
@@ -32,7 +32,7 @@ class AnimalSerializer(serializers.ModelSerializer):
             'birth_date', 'weight', 'health_status', 'status', 'owner', 
             'owner_name', 'purpose', 'purpose_name', 'age', 
             'last_vet_check', 'notes', 'image', 'history', 
-            'add_to_inventory', 'is_active', 'is_deleted'
+            'add_to_inventory', 'is_active', 'is_deleted',  'created_at', 'updated_at'
         ]
         read_only_fields = ['owner']
 

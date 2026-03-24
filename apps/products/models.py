@@ -4,6 +4,9 @@ class ProductType(models.Model):
     name = models.CharField(max_length=100, unique=True) # e.g., "Vaccine", "Feed"
     description = models.TextField(blank=True)
 
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
     def __str__(self):
         return self.name
 
@@ -23,6 +26,9 @@ class Product(models.Model):
         null=True, 
         blank=True
     )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return f"{self.description} ({self.product_type.name})"

@@ -11,6 +11,9 @@ class AnimalPurpose(models.Model):
     species = models.CharField(max_length=50, choices=SPECIES_CHOICES)
     name = models.CharField(max_length=100)
 
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
     def __str__(self):
         return f"{self.species} - {self.name}"
 
@@ -48,6 +51,9 @@ class Animal(models.Model):
     dam = models.ForeignKey("self", on_delete=models.SET_NULL, null=True, blank=True, related_name="offspring_from_dam", limit_choices_to={'gender': 'F'})
     sire = models.ForeignKey("self", on_delete=models.SET_NULL, null=True, blank=True, related_name="offspring_from_sire", limit_choices_to={'gender': 'M'})
 
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
     def __str__(self):
         return f"{self.tag_id} - {self.species}"
 
@@ -68,6 +74,9 @@ class AnimalHistory(models.Model):
     event_date = models.DateField(auto_now_add=True)
     performed_by = models.CharField(max_length=100, blank=True)
     next_due_date = models.DateField(null=True, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return f"{self.record_type}: {self.event_name} - {self.animal.tag_id}"

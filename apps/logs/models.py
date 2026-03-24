@@ -5,7 +5,9 @@ class ActivityLog(models.Model):
     description = models.TextField()
     module = models.CharField(max_length=100)  # e.g., 'Livestock', 'Inventory', 'Auth'
     username = models.CharField(max_length=150) # Captured from token
+
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         ordering = ['-created_at']

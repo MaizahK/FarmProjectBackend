@@ -4,7 +4,7 @@ from .models import Product, ProductType
 class ProductTypeSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProductType
-        fields = ['id', 'name', 'description']
+        fields = ['id', 'name', 'description',  'created_at', 'updated_at']
 
 class ProductSerializer(serializers.ModelSerializer):
     product_type_name = serializers.ReadOnlyField(source='product_type.name')
@@ -15,7 +15,7 @@ class ProductSerializer(serializers.ModelSerializer):
         model = Product
         fields = [
             'id', 'product_type', 'product_type_name', 'description', 
-            'quantity', 'unit', 'animal', 'add_to_inventory', 'is_deleted'
+            'quantity', 'unit', 'animal', 'add_to_inventory', 'is_deleted',  'created_at', 'updated_at'
         ]
 
     def create(self, validated_data):
