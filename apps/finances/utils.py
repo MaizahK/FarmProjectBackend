@@ -240,7 +240,7 @@ def process_unified_transaction(user, tx_type, amount, category, item_name, ref_
         if is_recurring and recurring_type_id:
             r_type = RecurringExpenseType.objects.get(id=recurring_type_id)
             RecurringExpense.objects.get_or_create(
-                expense_type=r_type, name=category,
+                expense_type=r_type, name=item_name,
                 defaults={'amount': amount}
             )
 
