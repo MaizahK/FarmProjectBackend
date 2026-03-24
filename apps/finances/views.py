@@ -56,6 +56,36 @@ class ExpenseViewSet(viewsets.ModelViewSet):
                 item_name=expense.category_name, reference_type=ContentType.objects.get_for_model(expense),
                 reference_id=expense.id
             )
+    
+    def perform_update(self, serializer):
+        # 1. Get the current state from the DB before saving
+        instance = self.get_object()
+        old_amount = instance.amount
+        old_category = instance.category_name
+
+        with db_transaction.atomic():
+            # 2. Save the new changes
+            expense = serializer.save()
+            
+            # 3. Detect changes and create a Ledger entry for the audit trail
+            changes = []
+            if old_amount != expense.amount:
+                changes.append(f"Amount updated from {old_amount} to {expense.amount}")
+            
+            if old_category != expense.category_name:
+                changes.append(f"Category updated from '{old_category}' to '{expense.category_name}'")
+
+            # 4. Only create a transaction entry if something actually changed
+            if changes:
+                FinancialTransaction.objects.create(
+                    type='EXPENSE', 
+                    amount=expense.amount, 
+                    category=expense.category_name,
+                    item_name=expense.category_name, 
+                    reference_type=ContentType.objects.get_for_model(expense),
+                    reference_id=expense.id,
+                    notes=" | ".join(changes) # Combines multiple changes into one note
+                )
 
 class RecurringExpenseTypeViewSet(viewsets.ModelViewSet):
     queryset = RecurringExpenseType.objects.all()
