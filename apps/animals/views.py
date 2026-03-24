@@ -48,11 +48,14 @@ class AnimalViewSet(viewsets.ModelViewSet):
         Logger.write(self.request.user, "Animal Updated", f"Updated: {instance.tag_id}", "Livestock")
         if getattr(serializer, '_add_to_inventory', False):
             self._adjust_inventory(instance, "add")
+        elif not getattr(serializer, '_add_to_inventory', True):
+            self._adjust_inventory(instance, "remove")
 
     def perform_destroy(self, instance):
         instance.is_deleted = True
         instance.is_active = False
         instance.save()
+        self._adjust_inventory(instance, "remove")
         Logger.write(self.request.user, "Animal Archived", f"Soft-deleted: {instance.tag_id}", "Livestock")
 
     def _adjust_inventory(self, instance, action):
@@ -61,6 +64,8 @@ class AnimalViewSet(viewsets.ModelViewSet):
             category=instance.species, item_name=instance.tag_id,
             quantity=1, unit="Units", action=action
         )
+        Logger.write(self.request.user, f"Inventory Updated ({action} animal)", f"Inventory updated: {instance.tag_id}", "Livestock")
+
 
 class AnimalHistoryViewSet(viewsets.ModelViewSet):
     queryset = AnimalHistory.objects.all()

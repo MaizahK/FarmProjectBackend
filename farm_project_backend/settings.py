@@ -32,11 +32,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.getenv('ENV_DJANGO_SECRET_KEY', '')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = bool(int(os.getenv('ENV_DEBUG', 0)))
+DEBUG = bool(int(os.getenv('ENV_DEBUG', 1)))
 
 ALLOWED_HOSTS = os.getenv('ENV_ALLOWED_HOSTS').split(',')
-
-
 APPEND_SLASH=False
 
 MEDIA_URL = '/assets/'
@@ -184,3 +182,4 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = 'static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
