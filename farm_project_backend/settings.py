@@ -35,6 +35,8 @@ SECRET_KEY = os.getenv('ENV_DJANGO_SECRET_KEY', '')
 DEBUG = bool(int(os.getenv('ENV_DEBUG', 0)))
 
 ALLOWED_HOSTS = os.getenv('ENV_ALLOWED_HOSTS').split(',')
+
+
 APPEND_SLASH=False
 
 MEDIA_URL = '/assets/'
