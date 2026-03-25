@@ -91,6 +91,7 @@ SIMPLE_JWT = {
 }
 
 CORS_ALLOW_ALL_ORIGINS = True
+CSRF_TRUSTED_ORIGINS = ["http://135.181.38.171"]
 
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
