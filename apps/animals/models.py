@@ -36,7 +36,7 @@ class Animal(models.Model):
     species = models.CharField(max_length=50, choices=SPECIES_CHOICES)
     breed = models.CharField(max_length=100)
     notes = models.CharField(max_length=5000, blank=True)
-    birth_date = models.DateField()
+    birth_date = models.DateField(blank=True, null=True)
     gender = models.CharField(max_length=1, choices=GENDER_CHOICES)
     weight = models.DecimalField(max_digits=6, decimal_places=2)
     health_status = models.CharField(max_length=20, choices=HEALTH_CHOICES, default='healthy')
