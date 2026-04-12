@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from django.utils import timezone
 from .models import Animal, AnimalPurpose, AnimalHistory
+from ..adal.serializers import AdalRecordSerializer
 
 class AnimalPurposeSerializer(serializers.ModelSerializer):
     class Meta:
@@ -22,6 +23,7 @@ class AnimalSerializer(serializers.ModelSerializer):
     purpose_name = serializers.ReadOnlyField(source='purpose.name')
     age = serializers.SerializerMethodField()
     history = AnimalHistorySerializer(many=True, read_only=True)
+    adal = AdalRecordSerializer(many=True, read_only=True)
     is_active = serializers.BooleanField(read_only=True)
     add_to_inventory = serializers.BooleanField(write_only=True, required=False, default=False)
 

@@ -14,4 +14,5 @@ urlpatterns = [
     path('', include('apps.inventory.urls')),
     path('', include('apps.finances.urls')),
     path('', include('apps.employees.urls')),
+    path('', include('apps.adal.urls')),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
