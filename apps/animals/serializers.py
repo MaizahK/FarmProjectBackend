@@ -33,7 +33,7 @@ class AnimalSerializer(serializers.ModelSerializer):
             'id', 'tag_id', 'name', 'species', 'breed', 'gender', 
             'birth_date', 'weight', 'health_status', 'status', 'owner', 
             'owner_name', 'purpose', 'purpose_name', 'age', 
-            'last_vet_check', 'notes', 'image', 'history', 
+            'last_vet_check', 'notes', 'image', 'history', 'adal',
             'add_to_inventory', 'is_active', 'is_deleted',  'created_at', 'updated_at'
         ]
         read_only_fields = ['owner']
