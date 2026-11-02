@@ -84,7 +84,7 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 from datetime import timedelta
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=30),
     'ROTATE_REFRESH_TOKENS': True,
     'BLACKLIST_AFTER_ROTATION': True,
     'AUTH_HEADER_TYPES': ('Bearer',),
@@ -92,7 +92,9 @@ SIMPLE_JWT = {
 }
 
 CORS_ALLOW_ALL_ORIGINS = True
-CSRF_TRUSTED_ORIGINS = ["http://135.181.38.171"]
+CSRF_TRUSTED_ORIGINS = os.getenv('ENV_CSRF_TRUSTED_ORIGINS', 'http://135.181.38.171').split(',')
+# nginx sets this header on every proxied request, so it can be trusted
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',

@@ -1,3 +1,4 @@
+from datetime import timedelta
 from django.db import transaction
 from django.contrib.contenttypes.models import ContentType
 from rest_framework.exceptions import ValidationError
@@ -245,28 +246,32 @@ def process_unified_transaction(user, tx_type, amount, category, item_name, ref_
             )
 
         if not is_standalone:
-            # Update Inventory
+            # Update Inventory (linked to the expense so a delete can reverse it)
             InventoryTransaction.objects.create(
                 content_type=ctype, object_id=item_id, transaction_type='PURCHASE',
-                quantity=qty, unit=unit, description=f"Bought {item_name}"
+                quantity=qty, unit=unit, description=f"Bought {item_name}",
+                reference_type=ContentType.objects.get_for_model(reference_obj), reference_id=reference_obj.id
             )
             adjust_inventory_stock_v2(user, ref_model, item_id, category, item_name, qty, unit, "add")
 
     # --- 2. INCOME (SALE) FLOW ---
     elif tx_type == 'INCOME':
-        # Scalable check for any model (Animal, Resource, Product)
-        target_inv_id = item_id if ref_model == 'animal' else 0
-        
-        inv_item = Inventory.objects.filter(
-            content_type=ctype, 
-            object_id=target_inv_id,
-            category_name=category
-        ).first()
+        if not is_standalone:
+            # Scalable check for any model (Animal, Resource, Product)
+            target_inv_id = item_id if ref_model == 'animal' else 0
 
-        if not inv_item:
-            raise ValidationError(f"Item '{category}' not found in inventory.")
-        if inv_item.quantity < qty:
-            raise ValidationError(f"Insufficient stock. Have: {inv_item.quantity}, Need: {qty}")
+            # Match on item_name too: it's the row adjust_inventory_stock_v2 deducts from
+            inv_item = Inventory.objects.filter(
+                content_type=ctype,
+                object_id=target_inv_id,
+                category_name=category,
+                item_name=item_name
+            ).first()
+
+            if not inv_item:
+                raise ValidationError(f"Item '{category}' not found in inventory.")
+            if inv_item.quantity < qty:
+                raise ValidationError(f"Insufficient stock. Have: {inv_item.quantity}, Need: {qty}")
 
         reference_obj = Sale.objects.create(
             content_type=ctype,
@@ -278,18 +283,20 @@ def process_unified_transaction(user, tx_type, amount, category, item_name, ref_
             notes=notes
         )
 
-        # Inventory Movement
-        InventoryTransaction.objects.create(
-            content_type=ctype, object_id=item_id, transaction_type='SALE',
-            quantity=qty, unit=unit, description=f"Sold {item_name}"
-        )
-        
-        # Deduct Stock
-        adjust_inventory_stock_v2(user, ref_model, item_id, category, item_name, qty, unit, "remove")
+        if not is_standalone:
+            # Inventory Movement (linked to the sale so a void can reverse it)
+            InventoryTransaction.objects.create(
+                content_type=ctype, object_id=item_id, transaction_type='SALE',
+                quantity=qty, unit=unit, description=f"Sold {item_name}",
+                reference_type=ContentType.objects.get_for_model(reference_obj), reference_id=reference_obj.id
+            )
 
-        # Animal Specific Logic
-        if ref_model == 'animal':
-            Animal.objects.filter(id=item_id).update(status='sold', is_active=False)
+            # Deduct Stock
+            adjust_inventory_stock_v2(user, ref_model, item_id, category, item_name, qty, unit, "remove")
+
+            # Animal Specific Logic
+            if ref_model == 'animal':
+                Animal.objects.filter(id=item_id).update(status='sold', is_active=False)
 
     # --- 3. LEDGER & LOG ---
     FinancialTransaction.objects.create(
@@ -301,6 +308,84 @@ def process_unified_transaction(user, tx_type, amount, category, item_name, ref_
 
     Logger.write(user, f"Finance: {tx_type}", f"Processed {category}", "Finance")
     return True
+
+MOVEMENT_PREFIXES = ("Sold ", "Bought ", "Buying ")
+
+def _find_stock_movements(record, record_ct, first_ledger):
+    """
+    Stock movements made by a sale/expense. Newer records link them via reference_*;
+    older ones are matched on item and creation time (within a few seconds).
+    """
+    movements = InventoryTransaction.objects.filter(
+        reference_type=record_ct, reference_id=record.id,
+        transaction_type__in=['SALE', 'PURCHASE'],
+    )
+    if movements.exists() or not record.content_type_id or not first_ledger:
+        return list(movements)
+
+    created = record.sale_date if isinstance(record, Sale) else record.expense_date
+    tx_type, prefix = ('SALE', "Sold ") if isinstance(record, Sale) else ('PURCHASE', "Bought ")
+    legacy = InventoryTransaction.objects.filter(
+        content_type_id=record.content_type_id, object_id=record.object_id,
+        transaction_type=tx_type, reference_id__isnull=True,
+        description=f"{prefix}{first_ledger.item_name}",
+        created_at__range=(created - timedelta(seconds=10), created + timedelta(seconds=10)),
+    )
+    if isinstance(record, Sale):
+        legacy = legacy.filter(quantity=record.quantity)
+    first = legacy.order_by('created_at').first()
+    return [first] if first else []
+
+@transaction.atomic
+def reverse_financial_record(user, record):
+    """
+    Undo a Sale or Expense before it is deleted: put back the stock it moved
+    and remove its ledger rows. Raises ValidationError if purchased stock is
+    already used up, so stock never goes negative.
+    """
+    record_ct = ContentType.objects.get_for_model(record)
+    ledger = FinancialTransaction.objects.filter(reference_type=record_ct, reference_id=record.id)
+    # The first row holds the original category/item; later rows are edit audits
+    first_ledger = ledger.order_by('id').first()
+
+    for mv in _find_stock_movements(record, record_ct, first_ledger):
+        model_name = mv.content_type.model
+        category = first_ledger.category if first_ledger else record.category_name
+        item_name = first_ledger.item_name if first_ledger and first_ledger.item_name else ""
+        if not item_name:
+            item_name = next((mv.description[len(p):] for p in MOVEMENT_PREFIXES if mv.description.startswith(p)), "")
+
+        if mv.transaction_type == 'PURCHASE':
+            target_id = mv.object_id if model_name == 'animal' else 0
+            stock = Inventory.objects.filter(
+                content_type=mv.content_type, object_id=target_id,
+                category_name=category, item_name=item_name,
+            ).first()
+            if not stock or stock.quantity < mv.quantity:
+                have = stock.quantity if stock else 0
+                raise ValidationError(
+                    f"Can't delete: only {have} of the {mv.quantity} {mv.unit} bought here is still in stock. "
+                    f"Adjust the stock first."
+                )
+            action, signed_qty = "remove", -mv.quantity
+        else:
+            action, signed_qty = "add", mv.quantity
+
+        if not adjust_inventory_stock_v2(user, model_name, mv.object_id, category, item_name, mv.quantity, mv.unit, action):
+            raise ValidationError(f"Couldn't restore stock for {item_name}.")
+
+        InventoryTransaction.objects.create(
+            content_type=mv.content_type, object_id=mv.object_id, transaction_type='ADJUSTMENT',
+            quantity=signed_qty, unit=mv.unit, description=f"Reversed: {mv.description}",
+        )
+
+        # A voided animal sale puts the animal back in the herd
+        if mv.transaction_type == 'SALE' and model_name == 'animal':
+            Animal.objects.filter(id=mv.object_id).update(status='active', is_active=True)
+
+    ledger.delete()
+    kind = "Sale" if isinstance(record, Sale) else "Expense"
+    Logger.write(user, f"Finance: {kind} reversed", f"Reversed {record.category_name} (id {record.id})", "Finance")
 
 @transaction.atomic
 def process_employee_salary_recurring(user, employee_id, amount, employee_name, is_recurring):

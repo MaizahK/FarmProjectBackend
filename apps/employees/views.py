@@ -1,5 +1,8 @@
 from rest_framework import viewsets, status
+from rest_framework.response import Response
 from django.db import transaction as db_transaction
+from django.db.models import ProtectedError
+from django.contrib.contenttypes.models import ContentType
 from .models import Employee, EmployeeType
 from .serializers import EmployeeSerializer, EmployeeTypeSerializer
 from ..finances.models import RecurringExpense, FinancialTransaction
@@ -9,6 +12,16 @@ from ..logs.utils.helper import Logger
 class EmployeeTypeViewSet(viewsets.ModelViewSet):
     queryset = EmployeeType.objects.all()
     serializer_class = EmployeeTypeSerializer
+
+    def destroy(self, request, *args, **kwargs):
+        # Employee.employee_type is PROTECT (also counts soft-deleted employees)
+        try:
+            return super().destroy(request, *args, **kwargs)
+        except ProtectedError:
+            return Response(
+                {"error": "This role is still assigned to employees (including removed ones) and can't be deleted."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
 class EmployeeViewSet(viewsets.ModelViewSet):
     serializer_class = EmployeeSerializer
@@ -44,9 +57,10 @@ class EmployeeViewSet(viewsets.ModelViewSet):
                     type='EXPENSE',
                     amount=employee.salary,
                     category="Salary",
-                    reference_type=ContentType.objects.get_for_model(expense),
-                    reference_id=expense.id,
-                    notes=f"Updated salary for employee ID: {employee_id}"
+                    item_name=f"{employee.first_name} {employee.last_name}",
+                    reference_type=ContentType.objects.get_for_model(employee),
+                    reference_id=employee.id,
+                    notes=f"Updated salary for employee ID: {employee.id}"
                 )
                 Logger.write(self.request.user, "Employee", f"Updated salary for {employee.id}", "Finance")
 

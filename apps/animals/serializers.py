@@ -10,6 +10,8 @@ class AnimalPurposeSerializer(serializers.ModelSerializer):
 
 class AnimalHistorySerializer(serializers.ModelSerializer):
     animal_tag = serializers.ReadOnlyField(source='animal.tag_id')
+    # Model field is auto_now_add (read-only by default); accept a date so past records can be logged
+    event_date = serializers.DateField(required=False)
 
     class Meta:
         model = AnimalHistory
@@ -31,8 +33,8 @@ class AnimalSerializer(serializers.ModelSerializer):
         model = Animal
         fields = [
             'id', 'tag_id', 'name', 'species', 'breed', 'gender', 
-            'birth_date', 'weight', 'health_status', 'status', 'owner', 
-            'owner_name', 'purpose', 'purpose_name', 'age', 
+            'birth_date', 'weight', 'health_status', 'status', 'owner',
+            'owner_name', 'purpose', 'purpose_name', 'age', 'dam', 'sire',
             'last_vet_check', 'notes', 'image', 'history', 'adal',
             'add_to_inventory', 'is_active', 'is_deleted',  'created_at', 'updated_at'
         ]

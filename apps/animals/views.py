@@ -46,10 +46,14 @@ class AnimalViewSet(viewsets.ModelViewSet):
     def perform_update(self, serializer):
         instance = serializer.save()
         Logger.write(self.request.user, "Animal Updated", f"Updated: {instance.tag_id}", "Livestock")
-        if getattr(serializer, '_add_to_inventory', False):
-            self._adjust_inventory(instance, "add")
-        elif not getattr(serializer, '_add_to_inventory', True):
-            self._adjust_inventory(instance, "remove")
+        # Only touch stock when the client explicitly sends the flag; the serializer
+        # defaults it to False, which used to remove the animal from inventory on every edit.
+        flag = self.request.data.get('add_to_inventory')
+        if flag is not None:
+            if str(flag).lower() in ('true', '1'):
+                self._adjust_inventory(instance, "add")
+            else:
+                self._adjust_inventory(instance, "remove")
 
     def perform_destroy(self, instance):
         instance.is_deleted = True
@@ -72,9 +76,29 @@ class AnimalHistoryViewSet(viewsets.ModelViewSet):
     serializer_class = AnimalHistorySerializer
     permission_classes = [IsAuthenticated]
 
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        animal = self.request.query_params.get("animal")
+        if animal:
+            queryset = queryset.filter(animal_id=animal)
+        return queryset
+
     def perform_create(self, serializer):
+        event_date = serializer.validated_data.get('event_date')
         instance = serializer.save()
+        # auto_now_add overwrites event_date on insert, so apply the chosen date afterwards
+        if event_date and instance.event_date != event_date:
+            AnimalHistory.objects.filter(pk=instance.pk).update(event_date=event_date)
+            instance.event_date = event_date
         Logger.write(self.request.user, "History Added", f"New {instance.record_type} for {instance.animal.tag_id}", "Livestock")
+
+    def perform_update(self, serializer):
+        instance = serializer.save()
+        Logger.write(self.request.user, "History Updated", f"Updated {instance.record_type} for {instance.animal.tag_id}", "Livestock")
+
+    def perform_destroy(self, instance):
+        Logger.write(self.request.user, "History Deleted", f"Removed {instance.record_type} for {instance.animal.tag_id}", "Livestock")
+        instance.delete()
 
 class AnimalPurposeViewSet(viewsets.ModelViewSet):
     queryset = AnimalPurpose.objects.all()

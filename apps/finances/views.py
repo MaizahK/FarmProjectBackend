@@ -1,11 +1,12 @@
 from rest_framework import viewsets, status
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.exceptions import ValidationError
 from django.db import transaction as db_transaction
 from django.contrib.contenttypes.models import ContentType
 from .models import Sale, Expense, RecurringExpenseType, RecurringExpense, FinancialTransaction
 from .serializers import *
-from .utils import process_unified_transaction
+from .utils import process_unified_transaction, reverse_financial_record
 
 class FinancialTransactionViewSet(viewsets.ModelViewSet):
     queryset = FinancialTransaction.objects.all()
@@ -27,6 +28,10 @@ class FinancialTransactionViewSet(viewsets.ModelViewSet):
                 data=serializer.validated_data
             )
             return Response({"status": "Success"}, status=status.HTTP_201_CREATED)
+        except ValidationError as e:
+            # str(e) would render as "[ErrorDetail(string=...)]" in the app
+            message = e.detail[0] if isinstance(e.detail, list) else e.detail
+            return Response({"error": str(message)}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -43,6 +48,38 @@ class SaleViewSet(viewsets.ModelViewSet):
                 reference_id=sale.id
             )
             # Logger.write(...) call here if needed
+
+    def perform_update(self, serializer):
+        instance = self.get_object()
+        old_total = instance.total_amount
+
+        with db_transaction.atomic():
+            # Stock was moved when the sale was created, so the sold item and
+            # quantity stay fixed; only price, paid status and notes change.
+            sale = serializer.save(
+                content_type=instance.content_type,
+                object_id=instance.object_id,
+                category_name=instance.category_name,
+                quantity=instance.quantity,
+            )
+
+            # Same audit-trail approach as expense edits
+            if old_total != sale.total_amount:
+                FinancialTransaction.objects.create(
+                    type='INCOME',
+                    amount=sale.total_amount,
+                    category=sale.category_name,
+                    item_name=sale.category_name,
+                    reference_type=ContentType.objects.get_for_model(sale),
+                    reference_id=sale.id,
+                    notes=f"Amount updated from {old_total:.2f} to {sale.total_amount:.2f}"
+                )
+
+    def perform_destroy(self, instance):
+        # Voiding a sale returns its stock and removes its ledger rows
+        with db_transaction.atomic():
+            reverse_financial_record(self.request.user, instance)
+            instance.delete()
 
 class ExpenseViewSet(viewsets.ModelViewSet):
     queryset = Expense.objects.all()
@@ -87,9 +124,25 @@ class ExpenseViewSet(viewsets.ModelViewSet):
                     notes=" | ".join(changes) # Combines multiple changes into one note
                 )
 
+    def perform_destroy(self, instance):
+        # Deleting a purchase takes its stock back out and removes its ledger rows
+        with db_transaction.atomic():
+            reverse_financial_record(self.request.user, instance)
+            instance.delete()
+
 class RecurringExpenseTypeViewSet(viewsets.ModelViewSet):
     queryset = RecurringExpenseType.objects.all()
     serializer_class = RecurringExpenseTypeSerializer
+
+    def destroy(self, request, *args, **kwargs):
+        # The FK cascades, so deleting a used type would silently delete its recurring expenses
+        in_use = RecurringExpense.objects.filter(expense_type=self.get_object()).count()
+        if in_use:
+            return Response(
+                {"error": f"This type is used by {in_use} recurring expense(s). Delete or change those first."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return super().destroy(request, *args, **kwargs)
 
 class RecurringExpenseViewSet(viewsets.ModelViewSet):
     queryset = RecurringExpense.objects.all()
