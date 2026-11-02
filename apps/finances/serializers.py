@@ -12,13 +12,15 @@ class FinancialTransactionSerializer(serializers.ModelSerializer):
     recurring_type = serializers.IntegerField(write_only=True, required=False, allow_null=True)
     is_standalone = serializers.BooleanField(write_only=True, default=False)
     is_paid = serializers.BooleanField(write_only=True, default=True)
+    # Day the sale/expense happened, for entries made after the fact (default: now)
+    date = serializers.DateField(write_only=True, required=False, allow_null=True)
 
     class Meta:
         model = FinancialTransaction
         fields = [
-            'id', 'type', 'amount', 'category', 'item_name', 'ref_model', 'item_id', 
+            'id', 'type', 'amount', 'category', 'item_name', 'ref_model', 'item_id',
             'qty', 'unit', 'payment_method', 'notes', 'created_at', 'updated_at',
-            'is_recurring', 'recurring_type', 'is_standalone', 'is_paid'
+            'is_recurring', 'recurring_type', 'is_standalone', 'is_paid', 'date'
         ]
 
 class ExpenseSerializer(serializers.ModelSerializer):

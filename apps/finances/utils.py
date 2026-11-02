@@ -1,5 +1,7 @@
-from datetime import timedelta
+from datetime import date, datetime, time, timedelta
+from zoneinfo import ZoneInfo
 from django.db import transaction
+from django.utils import timezone
 from django.contrib.contenttypes.models import ContentType
 from rest_framework.exceptions import ValidationError
 from .models import FinancialTransaction, Expense, Sale, RecurringExpense, RecurringExpenseType
@@ -7,6 +9,29 @@ from ..inventory.models import Inventory, InventoryTransaction
 from ..inventory.utils import adjust_inventory_stock, adjust_inventory_stock_v2
 from ..logs.utils.helper import Logger
 from ..animals.models import Animal
+
+FARM_TZ = ZoneInfo("Asia/Karachi")
+
+def resolve_entry_datetime(entry_date=None):
+    """
+    Timestamp for a record the user entered "for" a given day, so entries for
+    previous days land on that day. `entry_date` is a date or "YYYY-MM-DD".
+    Today (farm time) or no date -> now; a past day -> 12:00 farm time on that
+    day (noon keeps it on the same day in any nearby timezone). Future -> error.
+    """
+    if not entry_date:
+        return timezone.now()
+    if isinstance(entry_date, str):
+        try:
+            entry_date = date.fromisoformat(entry_date)
+        except ValueError:
+            raise ValidationError("Invalid date. Use YYYY-MM-DD.")
+    today = timezone.now().astimezone(FARM_TZ).date()
+    if entry_date > today:
+        raise ValidationError("The date can't be in the future.")
+    if entry_date == today:
+        return timezone.now()
+    return datetime.combine(entry_date, time(12, 0), tzinfo=FARM_TZ)
 
 @transaction.atomic
 def process_inventory_purchase(user, model_name, object_id, qty, amount, category, item_name, unit="Units"):
@@ -63,17 +88,18 @@ def process_inventory_purchase(user, model_name, object_id, qty, amount, categor
         return False
 
 @transaction.atomic
-def process_inventory_production(user, model_name, object_id, qty, category, item_name, unit="Units"):
+def process_inventory_production(user, model_name, object_id, qty, category, item_name, unit="Units", entry_dt=None):
     """
     Handles internal production/harvesting (e.g., Milk collection).
     Records an Inventory Transaction and updates the Stock Balance.
+    `entry_dt` dates the movement for batches entered for a previous day.
     """
     try:
         model_name = model_name.lower()
         ctype = ContentType.objects.get(model=model_name)
 
         # 1. Record Inventory Transaction (The Movement Log)
-        InventoryTransaction.objects.create(
+        movement = InventoryTransaction.objects.create(
             content_type=ctype,
             object_id=object_id,
             transaction_type='PRODUCTION', # Or 'HARVEST' depending on your choices
@@ -81,6 +107,9 @@ def process_inventory_production(user, model_name, object_id, qty, category, ite
             unit=unit,
             description=f"Produced/Collected {qty} {unit} of {item_name}",
         )
+        if entry_dt:
+            # created_at is auto_now_add, so it can only be changed after insert
+            InventoryTransaction.objects.filter(pk=movement.pk).update(created_at=entry_dt)
 
         # 2. Adjust Inventory Stock (The Current Balance)
         success = adjust_inventory_stock(
@@ -224,6 +253,8 @@ def process_unified_transaction(user, tx_type, amount, category, item_name, ref_
     recurring_type_id = data.get('recurring_type')
     is_paid = data.get('is_paid', True)
     notes = data.get('notes', '')
+    # Day the user is entering this for (defaults to now; past days allowed)
+    entry_dt = resolve_entry_datetime(data.get('date'))
 
     reference_obj = None
 
@@ -235,7 +266,8 @@ def process_unified_transaction(user, tx_type, amount, category, item_name, ref_
             category_name=category,
             amount=amount,
             is_paid=is_paid,
-            description=f"Expense for {item_name}"
+            description=f"Expense for {item_name}",
+            expense_date=entry_dt,
         )
 
         if is_recurring and recurring_type_id:
@@ -280,7 +312,8 @@ def process_unified_transaction(user, tx_type, amount, category, item_name, ref_
             quantity=qty,
             price_per_item=amount / qty if qty > 0 else amount,
             is_paid=is_paid,
-            notes=notes
+            notes=notes,
+            sale_date=entry_dt,
         )
 
         if not is_standalone:
@@ -305,6 +338,13 @@ def process_unified_transaction(user, tx_type, amount, category, item_name, ref_
         reference_id=reference_obj.id, payment_method=data.get('payment_method', 'Cash'),
         notes=notes
     )
+
+    # Stock movement + ledger rows carry the same date as the sale/expense, so
+    # histories line up for entries made for a previous day. created_at is
+    # auto_now_add, hence the update after insert.
+    ref_ct = ContentType.objects.get_for_model(reference_obj)
+    InventoryTransaction.objects.filter(reference_type=ref_ct, reference_id=reference_obj.id).update(created_at=entry_dt)
+    FinancialTransaction.objects.filter(reference_type=ref_ct, reference_id=reference_obj.id).update(created_at=entry_dt)
 
     Logger.write(user, f"Finance: {tx_type}", f"Processed {category}", "Finance")
     return True

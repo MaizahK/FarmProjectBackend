@@ -6,6 +6,7 @@ from rest_framework.permissions import IsAuthenticated
 from .models import Inventory, InventoryTransaction
 from .serializers import InventorySerializer, InventoryTransactionSerializer
 from .utils import adjust_inventory_stock
+from ..finances.utils import resolve_entry_datetime
 from ..logs.utils.helper import Logger
 from django.db import transaction as db_transaction
 
@@ -61,9 +62,14 @@ class InventoryTransactionViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def perform_create(self, serializer):
+        # Movement date (may be a previous day); validated before anything is saved
+        entry_dt = resolve_entry_datetime(serializer.validated_data.get('date'))
         with db_transaction.atomic():
             # 1. This now works because the extra fields were popped in the serializer
             inv_trans = serializer.save()
+            # created_at is auto_now_add, so the chosen day is applied after insert
+            InventoryTransaction.objects.filter(pk=inv_trans.pk).update(created_at=entry_dt)
+            inv_trans.created_at = entry_dt
             if not inv_trans.description:
                 # Keeps the item name in the log so InventoryViewSet.history can find it
                 inv_trans.description = f"{inv_trans.get_transaction_type_display()} of {getattr(serializer, '_item_name', 'Unknown')}"

@@ -1,6 +1,6 @@
 from django.shortcuts import render
 from ..logs.utils.helper import Logger
-from ..finances.utils import process_inventory_production
+from ..finances.utils import process_inventory_production, resolve_entry_datetime
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
 from .models import Product, ProductType
@@ -54,9 +54,15 @@ class ProductViewSet(viewsets.ModelViewSet):
         return queryset
 
     def perform_create(self, serializer):
+        # Batch date (may be a previous day); validated before anything is saved
+        entry_dt = resolve_entry_datetime(serializer.validated_data.get('date'))
+
         # 1. Save the model instance
         instance = serializer.save()
-        
+        # created_at is auto_now_add (and is the batch date), so set it after insert
+        Product.objects.filter(pk=instance.pk).update(created_at=entry_dt)
+        instance.created_at = entry_dt
+
         # 2. Basic Activity Log
         animal_info = f" from Animal: {instance.animal.tag_id}" if instance.animal else ""
         Logger.write(
@@ -76,7 +82,8 @@ class ProductViewSet(viewsets.ModelViewSet):
                 qty=instance.quantity,
                 category=instance.product_type.name,
                 item_name=instance.description,
-                unit=instance.unit
+                unit=instance.unit,
+                entry_dt=entry_dt,
             )
     def perform_update(self, serializer):
         instance = serializer.save()

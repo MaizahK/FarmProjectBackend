@@ -2,6 +2,7 @@ from django.db import models
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.conf import settings
+from django.utils import timezone
 
 class FinancialTransaction(models.Model):
     TRANSACTION_TYPES = [('INCOME', 'Income'), ('EXPENSE', 'Expense')]
@@ -35,7 +36,8 @@ class Sale(models.Model):
     quantity = models.DecimalField(max_digits=10, decimal_places=2)
     price_per_item = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
     total_amount = models.DecimalField(max_digits=12, decimal_places=2)
-    sale_date = models.DateTimeField(auto_now_add=True)
+    # Settable so sales can be entered for a previous day (defaults to now)
+    sale_date = models.DateTimeField(default=timezone.now)
     notes = models.TextField(blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
@@ -53,7 +55,8 @@ class Expense(models.Model):
     category_name = models.CharField(max_length=100)
     amount = models.DecimalField(max_digits=12, decimal_places=2)
     is_paid = models.BooleanField(default=False)
-    expense_date = models.DateTimeField(auto_now_add=True)
+    # Settable so expenses can be entered for a previous day (defaults to now)
+    expense_date = models.DateTimeField(default=timezone.now)
     description = models.CharField(max_length=255)
 
     created_at = models.DateTimeField(auto_now_add=True)
